@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -22,9 +23,15 @@ EXIT_IO = 3
 EXIT_FULFILL_FAIL = 4
 
 
+def _invoked_name() -> str:
+    argv0 = sys.argv[0] if sys.argv else ""
+    name = os.path.basename(argv0) if argv0 else ""
+    return name or "ade-dedrm"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="ade-dedrm",
+        prog=_invoked_name(),
         description="Fulfill ACSM files and remove Adobe Digital Editions (Adept) "
         "DRM from EPUB and PDF.",
     )

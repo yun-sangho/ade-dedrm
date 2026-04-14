@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 ade-dedrm = "ade_dedrm.cli:main"
+dedrm = "ade_dedrm.cli:main"
 
 [dependency-groups]
 dev = [
