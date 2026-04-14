@@ -15,8 +15,7 @@
 
 | 작업 | 서브커맨드 | 결과 |
 |---|---|---|
-| 로컬 macOS ADE 활성화 가져오기 | `import-ade` | `~/.config/ade-dedrm/` 에 상태 파일 3개 |
-| 사용자 RSA 키(.der) 추출 | `extract-key` | DRM 해제에 쓰는 `adobekey.der` |
+| 로컬 macOS ADE 활성화 + 사용자 키 가져오기 | `init` | `~/.config/ade-dedrm/` 에 상태 파일 + `adobekey.der` |
 | ACSM → 암호화된 책 다운로드 | `fulfill` | `.epub` 또는 `.pdf` (DRM 포함) |
 | DRM 해제 (EPUB/PDF 자동 판별) | `decrypt` | DRM-free 파일 |
 | **fulfill + decrypt 원샷** | `process` | DRM-free 파일 (권장) |
@@ -36,44 +35,35 @@ Python 3.12가 필요하다. `uv`가 자동으로 설치·고정한다.
 이미 Adobe Digital Editions가 설치돼 활성화돼 있다면:
 
 ```bash
-# 1. ADE 활성화 상태를 한 번만 가져옴
-uv run ade-dedrm import-ade
+# 1. ADE 활성화 상태 + 사용자 키를 한 번에 가져옴
+uv run ade-dedrm init
 
-# 2. 사용자 키 추출 (DRM 해제에 사용)
-uv run ade-dedrm extract-key -o ~/adobekey.der
-
-# 3. 구매한 .acsm 파일을 원샷으로 DRM-free 파일로 변환
-uv run ade-dedrm process ~/Downloads/book.acsm -k ~/adobekey.der
+# 2. 구매한 .acsm 파일을 원샷으로 DRM-free 파일로 변환
+uv run ade-dedrm process ~/Downloads/book.acsm
 # → ~/Downloads/book.epub (또는 book.pdf)
 ```
 
 ## 서브커맨드 상세
 
-### `import-ade` — ADE 활성화 상태 가져오기 (macOS 전용)
+### `init` — ADE 활성화 상태 + 사용자 키 가져오기 (macOS 전용)
 
 `~/Library/Application Support/Adobe/Digital Editions/activation.dat`와
 macOS 키체인의 `DeviceKey` / `DeviceFingerprint`를 조합해
-`~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml}` 를 만든다.
+`~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
+를 한 번에 만든다.
 
 ```bash
-uv run ade-dedrm import-ade [--force]
+uv run ade-dedrm init [--force] [-o PATH]
 ```
 
 - **선행 조건**: macOS에 ADE가 설치돼 있고 Help → Authorize Computer 로 본인 계정 인증 완료
 - 키체인 조회 시 macOS가 권한 프롬프트를 띄울 수 있음
-- `--force`: 기존 `~/.config/ade-dedrm/` 를 덮어씀
+- `--force`: 기존 `~/.config/ade-dedrm/` 및 `-o` 대상 파일을 덮어씀
+- `-o / --key-output PATH`: `adobekey.der` 의 추가 사본을 해당 경로에
+  복사한다. 원본은 항상 상태 디렉터리 안에 들어가므로 `decrypt` / `process`
+  는 `-k` 없이도 키를 찾을 수 있다.
 - **상태 디렉터리 위치**: `$ADE_DEDRM_HOME` 환경변수로 오버라이드 가능
   (기본값: `$XDG_CONFIG_HOME/ade-dedrm` 또는 `~/.config/ade-dedrm`)
-
-### `extract-key` — 사용자 RSA 키 추출
-
-```bash
-uv run ade-dedrm extract-key [-o PATH] [--force]
-```
-
-- `activation.dat` 에서 Adobe RSA 개인키를 뽑아 `.der` 파일로 저장
-- 기본 출력: `./adobekey.der`
-- 이 키는 `decrypt` / `process` 에서 DRM 해제에 사용
 
 ### `fulfill` — ACSM → 암호화된 EPUB/PDF
 
@@ -87,7 +77,7 @@ uv run ade-dedrm fulfill INPUT.acsm [-o OUTPUT] [--force]
   `META-INF/rights.xml` (EPUB) 또는 `/ADEPT_LICENSE` 객체 (PDF) 를 주입
 - **출력 확장자는 응답 형식에 따라 자동 결정** — EPUB이면 `.epub`, PDF면 `.pdf`
 - 이 단계까지는 여전히 DRM이 걸린 파일. 읽으려면 `decrypt` 필요
-- **선행 조건**: `import-ade` 로 상태 디렉터리가 이미 구성돼 있어야 함
+- **선행 조건**: `init` 로 상태 디렉터리가 이미 구성돼 있어야 함
 
 ### `decrypt` — Adept DRM 해제 (EPUB/PDF 자동 판별)
 
@@ -108,7 +98,7 @@ uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
 
 - `fulfill` 로 암호화된 책을 임시 파일에 받고 즉시 `decrypt` 해서 결과만 남김
 - 중간 결과물 없이 `.acsm` → DRM-free 파일이 한 번에 나옴
-- `-k` 를 생략하면 자동으로 `<state_dir>/adobekey.der` 또는 `extract-key` 결과를 사용
+- `-k` 를 생략하면 `init` 이 심어둔 `<state_dir>/adobekey.der` 를 사용
 
 ## 사용 예시
 
@@ -116,11 +106,10 @@ uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
 
 ```bash
 # 초기 설정 (한 번만)
-uv run ade-dedrm import-ade
-uv run ade-dedrm extract-key -o ~/adobekey.der
+uv run ade-dedrm init
 
 # 이후 구매한 책은 전부 이 한 줄로
-uv run ade-dedrm process ~/Downloads/새로운책.acsm -k ~/adobekey.der -o ~/Books/새로운책.epub
+uv run ade-dedrm process ~/Downloads/새로운책.acsm -o ~/Books/새로운책.epub
 ```
 
 ### 이미 다운로드된 DRM 파일 해제
@@ -138,8 +127,8 @@ uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.pdf
 
 ```bash
 export ADE_DEDRM_HOME=$(mktemp -d)
-uv run ade-dedrm import-ade
-uv run ade-dedrm process book.acsm -k /path/to/key.der
+uv run ade-dedrm init
+uv run ade-dedrm process book.acsm
 ```
 
 ## 크로스플랫폼 현황
@@ -151,10 +140,10 @@ uv run ade-dedrm process book.acsm -k /path/to/key.der
 |---|---|---|---|
 | DRM 해제 (`decrypt`) | ✅ | ✅ | ✅ |
 | ACSM fulfillment (`fulfill`/`process`) | ✅ | ✅ | ✅ |
-| 상태 bootstrap (`import-ade`) | ✅ | ❌ | ❌ |
+| 상태 bootstrap (`init`) | ✅ | ❌ | ❌ |
 | 상태 bootstrap (`activate`) | 🗓 예정 | 🗓 예정 | 🗓 예정 |
 
-즉 macOS 사용자가 한 번 `import-ade` 로 만든 `~/.config/ade-dedrm/` 를
+즉 macOS 사용자가 한 번 `init` 로 만든 `~/.config/ade-dedrm/` 를
 다른 OS 기기에 복사하면 거기서도 `fulfill` / `decrypt` 가 그대로 동작한다.
 
 **완전한 크로스플랫폼 지원 계획**: Tier 3 (`ade-dedrm activate --anonymous` /
@@ -181,13 +170,13 @@ Google 서버의 거부다. `play.google.com/books` → 설정 → 기기 관리
 
 ### `E_ADEPT_DISTRIBUTOR_AUTH`
 
-우리가 이미 재시도 로직을 넣어두었지만 실패가 반복되면 `import-ade` 를 다시 실행해
+우리가 이미 재시도 로직을 넣어두었지만 실패가 반복되면 `init` 를 다시 실행해
 상태를 새로 만들거나, Adobe 계정 device limit 을 확인.
 
 ### `wrong key` / `decryption failed`
 
-`extract-key` 의 결과 `.der` 이 현재 ADE 계정과 다른 활성화에서 나온 것. 같은 계정의
-`activation.dat` 에서 다시 뽑아야 한다.
+상태 디렉터리의 `adobekey.der` 가 현재 ADE 계정과 다른 활성화에서 나온 것.
+같은 계정의 `activation.dat` 로 `init --force` 를 다시 실행해 상태를 새로 만든다.
 
 ### `%PDF-` 인데 `EBX_HANDLER` / `ADEPT_LICENSE` 단어가 안 보임
 

@@ -17,8 +17,7 @@
 
 | Task | Subcommand | Output |
 |---|---|---|
-| Import an existing local ADE activation (macOS) | `import-ade` | 3 state files under `~/.config/ade-dedrm/` |
-| Extract your Adobe RSA user key (`.der`) | `extract-key` | `adobekey.der` used by `decrypt` |
+| Bootstrap state + user key from a local ADE install (macOS) | `init` | state files + `adobekey.der` under `~/.config/ade-dedrm/` |
 | ACSM → encrypted book download | `fulfill` | `.epub` or `.pdf` (still DRM-wrapped) |
 | Remove Adept DRM (EPUB/PDF auto-detected) | `decrypt` | DRM-free file |
 | **`fulfill` + `decrypt` in one shot** | `process` | DRM-free file (recommended) |
@@ -39,46 +38,37 @@ Assuming Adobe Digital Editions is already installed and authorized with
 your Adobe ID:
 
 ```bash
-# 1. Bootstrap the state directory from your local ADE install (run once)
-uv run ade-dedrm import-ade
+# 1. Bootstrap state + user key from your local ADE install (run once)
+uv run ade-dedrm init
 
-# 2. Export your user RSA key (used for DRM removal)
-uv run ade-dedrm extract-key -o ~/adobekey.der
-
-# 3. Turn a purchased .acsm into a clean EPUB or PDF in one shot
-uv run ade-dedrm process ~/Downloads/book.acsm -k ~/adobekey.der
+# 2. Turn a purchased .acsm into a clean EPUB or PDF in one shot
+uv run ade-dedrm process ~/Downloads/book.acsm
 # → ~/Downloads/book.epub (or book.pdf)
 ```
 
 ## Subcommand reference
 
-### `import-ade` — bootstrap state from a local ADE install (macOS only)
+### `init` — bootstrap state + user key from a local ADE install (macOS only)
 
 Combines `~/Library/Application Support/Adobe/Digital Editions/activation.dat`
 with the `DeviceKey` / `DeviceFingerprint` entries stored in the macOS
-keychain, producing `~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml}`.
+keychain, producing `~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
+in one shot.
 
 ```bash
-uv run ade-dedrm import-ade [--force]
+uv run ade-dedrm init [--force] [-o PATH]
 ```
 
 - **Precondition**: ADE is installed and you have already completed
   Help → Authorize Computer with your Adobe ID.
 - macOS may prompt for keychain access when reading the device secrets.
-- `--force`: overwrite an existing `~/.config/ade-dedrm/` directory.
+- `--force`: overwrite an existing `~/.config/ade-dedrm/` directory (and
+  any `-o` target).
+- `-o / --key-output PATH`: also write an extra copy of `adobekey.der`
+  to the given path. The canonical copy always lives under the state
+  directory, so `decrypt` / `process` can find it without `-k`.
 - **State directory location** can be overridden with `$ADE_DEDRM_HOME`
   (default: `$XDG_CONFIG_HOME/ade-dedrm`, falling back to `~/.config/ade-dedrm`).
-
-### `extract-key` — export your Adobe RSA user key
-
-```bash
-uv run ade-dedrm extract-key [-o PATH] [--force]
-```
-
-- Parses `activation.dat` to recover the Adobe RSA private key and writes
-  it as a `.der` file.
-- Default output: `./adobekey.der`.
-- This key is what `decrypt` / `process` need to strip Adept DRM.
 
 ### `fulfill` — ACSM → encrypted EPUB / PDF
 
@@ -96,7 +86,7 @@ uv run ade-dedrm fulfill INPUT.acsm [-o OUTPUT] [--force]
   server returned — `.epub` or `.pdf`.
 - The output is still DRM-wrapped; you still need `decrypt` to actually
   read it.
-- **Precondition**: `import-ade` must have populated the state directory.
+- **Precondition**: `init` must have populated the state directory.
 
 ### `decrypt` — remove Adept DRM (EPUB / PDF auto-detected)
 
@@ -120,9 +110,8 @@ uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
 
 - Internally runs `fulfill` into a temp file and immediately `decrypt`s
   it into the final output. No intermediate DRM file is left on disk.
-- `-k` is optional — if omitted, the tool will look for
-  `<state_dir>/adobekey.der` or fall back to running `extract-key` on
-  the fly.
+- `-k` is optional — if omitted, the tool reads
+  `<state_dir>/adobekey.der` (written by `init`).
 
 ## Usage examples
 
@@ -130,12 +119,10 @@ uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
 
 ```bash
 # One-time setup
-uv run ade-dedrm import-ade
-uv run ade-dedrm extract-key -o ~/adobekey.der
+uv run ade-dedrm init
 
 # Every future purchase is a single command
-uv run ade-dedrm process ~/Downloads/new_book.acsm \
-    -k ~/adobekey.der -o ~/Books/new_book.epub
+uv run ade-dedrm process ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
 ```
 
 ### Decrypt files you already downloaded
@@ -153,8 +140,8 @@ Useful for sandboxed tests or multiple activations:
 
 ```bash
 export ADE_DEDRM_HOME=$(mktemp -d)
-uv run ade-dedrm import-ade
-uv run ade-dedrm process book.acsm -k /path/to/key.der
+uv run ade-dedrm init
+uv run ade-dedrm process book.acsm
 ```
 
 ## Cross-platform status
@@ -167,10 +154,10 @@ is how the initial state files are obtained:
 |---|---|---|---|
 | DRM removal (`decrypt`) | ✅ | ✅ | ✅ |
 | ACSM fulfillment (`fulfill` / `process`) | ✅ | ✅ | ✅ |
-| State bootstrap (`import-ade`) | ✅ | ❌ | ❌ |
+| State bootstrap (`init`) | ✅ | ❌ | ❌ |
 | State bootstrap (`activate`) | 🗓 planned | 🗓 planned | 🗓 planned |
 
-A macOS user can run `import-ade` once and copy the resulting
+A macOS user can run `init` once and copy the resulting
 `~/.config/ade-dedrm/` directory to any Linux or Windows machine —
 everything downstream of that state will work without changes.
 
@@ -209,14 +196,14 @@ After freeing a slot, download a fresh `.acsm` from Play Books and retry.
 ### `E_ADEPT_DISTRIBUTOR_AUTH`
 
 The tool already retries this automatically. If it persists, re-run
-`import-ade` to refresh the state directory, or check the Adobe account
+`init` to refresh the state directory, or check the Adobe account
 device limit at `account.adobe.com`.
 
 ### `wrong key` / `decryption failed`
 
-The `.der` file from `extract-key` is from a different ADE activation
-than the one that fulfilled the book. Re-extract from the `activation.dat`
-that belongs to the same Adobe ID.
+The `adobekey.der` in your state directory is from a different ADE
+activation than the one that fulfilled the book. Re-run `init --force`
+against the `activation.dat` that belongs to the same Adobe ID.
 
 ### `%PDF-` file but no `EBX_HANDLER` / `ADEPT_LICENSE` inside
 

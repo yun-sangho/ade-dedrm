@@ -31,22 +31,21 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
-    ek = sub.add_parser(
-        "extract-key",
-        help="Extract the Adobe user key from a local macOS ADE install.",
+    init = sub.add_parser(
+        "init",
+        help="Bootstrap state + user key from a local macOS ADE install.",
     )
-    ek.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=Path("adobekey.der"),
-        help="Output .der file path (default: ./adobekey.der).",
-    )
-    ek.add_argument(
-        "-f",
+    init.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite the output file if it already exists.",
+        help="Overwrite existing ade-dedrm state and any -o target.",
+    )
+    init.add_argument(
+        "-o",
+        "--key-output",
+        type=Path,
+        default=None,
+        help="Also write a copy of adobekey.der to this path.",
     )
 
     dec = sub.add_parser(
@@ -78,16 +77,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Overwrite the output file if it already exists.",
     )
 
-    ia = sub.add_parser(
-        "import-ade",
-        help="Copy activation state from a local macOS Adobe Digital Editions install.",
-    )
-    ia.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite existing ade-dedrm state if present.",
-    )
-
     ff = sub.add_parser(
         "fulfill",
         help="Fulfill an .acsm file into an (encrypted) EPUB or PDF.",
@@ -115,7 +104,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-k",
         "--key",
         type=Path,
-        help="Adobe user key .der file (default: <state>/adobekey.der or ./adobekey.der).",
+        help="Adobe user key .der file (default: <state_dir>/adobekey.der).",
     )
     pr.add_argument(
         "-o",
@@ -133,20 +122,46 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _cmd_extract_key(args: argparse.Namespace) -> int:
-    if args.output.exists() and not args.force:
+def _cmd_init(args: argparse.Namespace) -> int:
+    from ade_dedrm.adobe_import import ADEImportError, import_from_ade
+    from ade_dedrm.adobe_state import DeviceState, state_dir
+
+    state = DeviceState(root=state_dir())
+    if state.exists() and not args.force:
         print(
-            f"error: {args.output} already exists (use --force to overwrite)",
+            f"error: {state.root} already populated (use --force to overwrite)",
             file=sys.stderr,
         )
+        return EXIT_IO
+    if (
+        args.key_output is not None
+        and args.key_output.exists()
+        and not args.force
+    ):
+        print(
+            f"error: {args.key_output} already exists (use --force to overwrite)",
+            file=sys.stderr,
+        )
+        return EXIT_IO
+    try:
+        import_from_ade(state)
+    except ADEImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return EXIT_IO
     try:
         key, label = extract_adobe_key()
     except KeyError_ as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_IO
-    args.output.write_bytes(key)
-    print(f"Saved key for '{label}' to {args.output}")
+
+    key_path = state.root / "adobekey.der"
+    key_path.write_bytes(key)
+    key_path.chmod(0o600)
+    print(f"Initialized ade-dedrm state in {state.root} (key: '{label}')")
+    if args.key_output is not None:
+        args.key_output.parent.mkdir(parents=True, exist_ok=True)
+        args.key_output.write_bytes(key)
+        print(f"Also wrote key copy to {args.key_output}")
     return EXIT_OK
 
 
@@ -220,26 +235,6 @@ def _cmd_decrypt(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _cmd_import_ade(args: argparse.Namespace) -> int:
-    from ade_dedrm.adobe_import import ADEImportError, import_from_ade
-    from ade_dedrm.adobe_state import DeviceState, state_dir
-
-    state = DeviceState(root=state_dir())
-    if state.exists() and not args.force:
-        print(
-            f"error: {state.root} already populated (use --force to overwrite)",
-            file=sys.stderr,
-        )
-        return EXIT_IO
-    try:
-        import_from_ade(state)
-    except ADEImportError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return EXIT_IO
-    print(f"Imported ADE activation into {state.root}")
-    return EXIT_OK
-
-
 def _validate_output(input_path: Path, output: Path, force: bool) -> int | None:
     if output.resolve() == input_path.resolve():
         print("error: input and output must be different files", file=sys.stderr)
@@ -266,7 +261,7 @@ def _cmd_fulfill(args: argparse.Namespace) -> int:
     state = DeviceState(root=state_dir())
     if not state.exists():
         print(
-            "error: no ade-dedrm activation state found. Run `ade-dedrm import-ade` first.",
+            "error: no ade-dedrm activation state found. Run `ade-dedrm init` first.",
             file=sys.stderr,
         )
         return EXIT_IO
@@ -320,7 +315,7 @@ def _cmd_process(args: argparse.Namespace) -> int:
     state = DeviceState(root=state_dir())
     if not state.exists():
         print(
-            "error: no ade-dedrm activation state found. Run `ade-dedrm import-ade` first.",
+            "error: no ade-dedrm activation state found. Run `ade-dedrm init` first.",
             file=sys.stderr,
         )
         return EXIT_IO
@@ -399,12 +394,10 @@ def _cmd_process(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
-    if args.command == "extract-key":
-        return _cmd_extract_key(args)
+    if args.command == "init":
+        return _cmd_init(args)
     if args.command == "decrypt":
         return _cmd_decrypt(args)
-    if args.command == "import-ade":
-        return _cmd_import_ade(args)
     if args.command == "fulfill":
         return _cmd_fulfill(args)
     if args.command == "process":

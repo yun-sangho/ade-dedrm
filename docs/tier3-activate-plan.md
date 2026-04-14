@@ -24,7 +24,7 @@
 이 단계의 목표는 ADE 설치 없이 Adobe 서버에 직접 디바이스를 등록해 상태 파일을 생성하는 `activate` 서브커맨드를 추가하는 것이다. 완성되면:
 
 - **Linux/Windows/macOS 어디서든** `uv tool install ade-dedrm` 후 `ade-dedrm activate --anonymous`만으로 쓸 수 있다
-- ADE 기존 사용자는 여전히 `import-ade`로 기존 활성화를 재사용할 수 있다 (두 경로 공존)
+- ADE 기존 사용자는 여전히 `init`로 기존 활성화를 재사용할 수 있다 (두 경로 공존)
 - 이후 Tier 2(Windows 네이티브 import), Tier 1(export/import state) 확장 시 이 모듈이 공통 기반이 된다
 
 참고 구현: DeACSM `/Users/sangho/Downloads/DeACSM_0.0.16/libadobeAccount.py` (927 LOC) + `libadobe.py` 일부. 이를 정제·포팅한다.
@@ -105,7 +105,7 @@ ade-dedrm activate --adobe-id EMAIL [--ade-version VER] [--force]
 - `--anonymous` 와 `--adobe-id EMAIL` 는 mutually exclusive, 하나 필수 (`required=True` mutex group)
 - `--adobe-id` 지정 시 TTY에서 `getpass.getpass("Adobe ID password: ")` 로 비밀번호 입력. TTY 아니면 `error: password requires an interactive terminal`로 거부
 - `--ade-version` 는 `{2.0.1, 3.0.1, 4.0.3}` 선택지, 기본 `2.0.1` (ADE 2.0.1 build 78765, DeACSM 권장 기본값)
-- `--force` 는 기존 state dir 존재 시 덮어쓸지 여부 (기존 `import-ade`와 동일)
+- `--force` 는 기존 state dir 존재 시 덮어쓸지 여부 (기존 `init`와 동일)
 
 종료 코드:
 - `0` 성공
@@ -574,7 +574,7 @@ uv run ade-dedrm activate --adobe-id test@example.com
 - `fulfill` 서브커맨드가 해당 state로 실제 ACSM을 처리해서 암호화된 EPUB 다운로드 성공
 - `decrypt`까지 통과해서 DRM-free 파일 얻음
 - anonymous / Adobe ID 양쪽 경로 모두 독립적으로 검증
-- 기존 macOS `import-ade` 경로는 영향 없이 그대로 동작
+- 기존 macOS `init` 경로는 영향 없이 그대로 동작
 
 ### 실패 시 체크리스트
 
