@@ -12,6 +12,7 @@ from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
 from ade_dedrm import cli, epub, keyfetch  # noqa: F401
+from ade_dedrm.cli import _default_output
 from ade_dedrm.epub import decrypt_book, is_adept_epub
 
 
@@ -19,7 +20,9 @@ def test_cli_help_runs(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
         cli.main(["--help"])
     assert exc.value.code == 0
-    assert "ade-dedrm" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Fulfill ACSM" in out
+    assert "{init,decrypt}" in out
 
 
 def test_decrypt_subcommand_help(capsys: pytest.CaptureFixture[str]) -> None:
@@ -28,6 +31,51 @@ def test_decrypt_subcommand_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert exc.value.code == 0
     out = capsys.readouterr().out
     assert "--key" in out
+
+
+@pytest.mark.parametrize(
+    ("input_name", "ext", "expected"),
+    [
+        # Hyphen / underscore / space / dot separators.
+        ("은하영웅전설_2_야망편-epub.acsm", ".epub", "은하영웅전설_2_야망편.epub"),
+        ("은하영웅전설_2_야망편_epub.acsm", ".epub", "은하영웅전설_2_야망편.epub"),
+        ("은하영웅전설_2_야망편 epub.acsm", ".epub", "은하영웅전설_2_야망편.epub"),
+        ("은하영웅전설_2_야망편.epub.acsm", ".epub", "은하영웅전설_2_야망편.epub"),
+        ("book-pdf.acsm", ".pdf", "book.pdf"),
+        ("book_pdf.acsm", ".pdf", "book.pdf"),
+        # Bracket wrappers.
+        ("book(epub).acsm", ".epub", "book.epub"),
+        ("book[epub].acsm", ".epub", "book.epub"),
+        ("book{epub}.acsm", ".epub", "book.epub"),
+        ("book (pdf).acsm", ".pdf", "book.pdf"),
+        ("book_(epub).acsm", ".epub", "book.epub"),
+        ("book-[pdf].acsm", ".pdf", "book.pdf"),
+        # Case-insensitive.
+        ("book-EPUB.acsm", ".epub", "book.epub"),
+        ("book-PDF.acsm", ".pdf", "book.pdf"),
+        ("book_(ePub).acsm", ".epub", "book.epub"),
+        # Already-decrypted path with ``.nodrm`` default extension.
+        ("book-epub.epub", ".nodrm.epub", "book.nodrm.epub"),
+        ("book_(pdf).pdf", ".nodrm.pdf", "book.nodrm.pdf"),
+        # Doubly-tagged stems get peeled iteratively.
+        ("book-epub.pdf.acsm", ".pdf", "book.pdf"),
+        # No format tag → stem is preserved untouched.
+        ("plain.acsm", ".epub", "plain.epub"),
+        # Tag-like substring without a separator → not stripped (avoid false positives).
+        ("bookepub.acsm", ".epub", "bookepub.epub"),
+        # Tag not at the end → not stripped.
+        ("my-epub-book.acsm", ".epub", "my-epub-book.epub"),
+        # Stripping would leave an empty stem → keep original.
+        ("epub.acsm", ".epub", "epub.epub"),
+        ("-epub.acsm", ".epub", "-epub.epub"),
+        ("(pdf).acsm", ".pdf", "(pdf).pdf"),
+    ],
+)
+def test_default_output_strips_format_tag(
+    tmp_path: Path, input_name: str, ext: str, expected: str
+) -> None:
+    result = _default_output(tmp_path / input_name, ext)
+    assert result == tmp_path / expected
 
 
 def test_not_drm_returns_1(tmp_path: Path) -> None:

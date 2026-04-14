@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -148,6 +149,22 @@ def _is_acsm(path: Path) -> bool:
     return path.suffix.lower() == ".acsm"
 
 
+_FORMAT_TAG_RE = re.compile(
+    r"(?:[\s._\-]+[\(\[\{]?|[\(\[\{])\s*(?:epub|pdf)\s*[\)\]\}]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _default_output(input_path: Path, ext: str) -> Path:
+    stem = input_path.stem
+    while True:
+        stripped = _FORMAT_TAG_RE.sub("", stem).rstrip()
+        if not stripped or stripped == stem:
+            break
+        stem = stripped
+    return input_path.with_name(stem + ext)
+
+
 def _validate_output(input_path: Path, output: Path, force: bool) -> int | None:
     if output.resolve() == input_path.resolve():
         print("error: input and output must be different files", file=sys.stderr)
@@ -212,7 +229,7 @@ def _handle_drm_file(args: argparse.Namespace) -> int:
         return userkey
 
     default_ext = ".nodrm.epub" if fmt == "epub" else ".nodrm.pdf"
-    output = args.output or args.input.with_suffix(default_ext)
+    output = args.output or _default_output(args.input, default_ext)
     validation = _validate_output(args.input, output, args.force)
     if validation is not None:
         return validation
@@ -285,7 +302,7 @@ def _handle_acsm(args: argparse.Namespace) -> int:
         return EXIT_FULFILL_FAIL
 
     default_ext = f".{fmt}"
-    resolved = args.output or args.input.with_suffix(default_ext)
+    resolved = args.output or _default_output(args.input, default_ext)
     validation = _validate_output(args.input, resolved, args.force)
     if validation is not None:
         tmp_path.unlink()
