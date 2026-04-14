@@ -1,0 +1,33 @@
+ade-dedrm
+Copyright (C) 2026 yun-sangho
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, version 3 of the License.
+
+=============================================================================
+THIRD-PARTY ATTRIBUTIONS
+=============================================================================
+
+Portions of this software (src/ade_dedrm/epub.py and src/ade_dedrm/keyfetch.py)
+are derived from DeDRM_tools:
+
+    https://github.com/noDRM/DeDRM_tools
+    Copyright (C) 2009-2022 i♥cabbages, Apprentice Harper, noDRM et al.
+    Licensed under the GNU General Public License, version 3.
+
+Specifically:
+
+- epub.py is a refactored, trimmed port of
+  DeDRM_plugin/ineptepub.py
+  (Decryptor class, decryptBook function, removeHardening helper).
+  The PassHash (Barnes & Noble) code path, Calibre plugin shims, Tkinter GUI,
+  and Python 2 compatibility shims have been removed.
+
+- keyfetch.py is a refactored port of the macOS branch of
+  DeDRM_plugin/adobekey.py
+  (adeptkeys / findActivationDat). The Windows and Linux branches, the ctypes
+  Windows API bindings, and the Tkinter GUI have been removed.
+
+The original authors retain copyright on the ported portions. This project
+inherits the GPL v3 license from that upstream work.
