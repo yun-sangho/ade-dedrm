@@ -16,9 +16,7 @@
 | 작업 | 서브커맨드 | 결과 |
 |---|---|---|
 | 로컬 macOS ADE 활성화 + 사용자 키 가져오기 | `init` | `~/.config/ade-dedrm/` 에 상태 파일 + `adobekey.der` |
-| ACSM → 암호화된 책 다운로드 | `fulfill` | `.epub` 또는 `.pdf` (DRM 포함) |
-| DRM 해제 (EPUB/PDF 자동 판별) | `decrypt` | DRM-free 파일 |
-| **fulfill + decrypt 원샷** | `process` | DRM-free 파일 (권장) |
+| ACSM fulfillment + Adept DRM 해제 (ACSM/EPUB/PDF 자동 판별) | `decrypt` | DRM-free EPUB/PDF |
 
 ## 설치
 
@@ -39,7 +37,7 @@ Python 3.12가 필요하다. `uv`가 자동으로 설치·고정한다.
 uv run ade-dedrm init
 
 # 2. 구매한 .acsm 파일을 원샷으로 DRM-free 파일로 변환
-uv run ade-dedrm process ~/Downloads/book.acsm
+uv run ade-dedrm decrypt ~/Downloads/book.acsm
 # → ~/Downloads/book.epub (또는 book.pdf)
 ```
 
@@ -60,45 +58,41 @@ uv run ade-dedrm init [--force] [-o PATH]
 - 키체인 조회 시 macOS가 권한 프롬프트를 띄울 수 있음
 - `--force`: 기존 `~/.config/ade-dedrm/` 및 `-o` 대상 파일을 덮어씀
 - `-o / --key-output PATH`: `adobekey.der` 의 추가 사본을 해당 경로에
-  복사한다. 원본은 항상 상태 디렉터리 안에 들어가므로 `decrypt` / `process`
-  는 `-k` 없이도 키를 찾을 수 있다.
+  복사한다. 원본은 항상 상태 디렉터리 안에 들어가므로 `decrypt` 는
+  `-k` 없이도 키를 찾을 수 있다.
 - **상태 디렉터리 위치**: `$ADE_DEDRM_HOME` 환경변수로 오버라이드 가능
   (기본값: `$XDG_CONFIG_HOME/ade-dedrm` 또는 `~/.config/ade-dedrm`)
 
-### `fulfill` — ACSM → 암호화된 EPUB/PDF
+### `decrypt` — `.acsm` 또는 Adept DRM EPUB/PDF → DRM-free 파일
 
 ```bash
-uv run ade-dedrm fulfill INPUT.acsm [-o OUTPUT] [--force]
+uv run ade-dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
 ```
 
-- `.acsm` 을 파싱해 `operatorURL`을 추출한 뒤, Adobe의 tree-hash + textbook RSA 서명으로
-  요청을 만들어 ACS4 서버에 POST
-- 서버 응답에서 다운로드 URL을 가져와 실제 암호화된 파일을 내려받고,
-  `META-INF/rights.xml` (EPUB) 또는 `/ADEPT_LICENSE` 객체 (PDF) 를 주입
-- **출력 확장자는 응답 형식에 따라 자동 결정** — EPUB이면 `.epub`, PDF면 `.pdf`
-- 이 단계까지는 여전히 DRM이 걸린 파일. 읽으려면 `decrypt` 필요
-- **선행 조건**: `init` 로 상태 디렉터리가 이미 구성돼 있어야 함
+입력 파일 종류(확장자 / 매직 바이트)를 자동 판별해 알맞은 경로로 실행한다:
 
-### `decrypt` — Adept DRM 해제 (EPUB/PDF 자동 판별)
+- **`.acsm` fulfillment 티켓**: `.acsm` 을 파싱해 `operatorURL`을 추출하고,
+  Adobe의 tree-hash + textbook RSA 서명으로 요청을 만들어 ACS4 서버에 POST.
+  응답에서 암호화된 책을 받아 곧바로 메모리에서 복호해 DRM-free 파일만
+  남긴다. 중간 DRM 파일은 디스크에 남지 않는다. 기본 출력은 서버가
+  돌려준 형식에 따라 `<input_stem>.<epub|pdf>`.
+  **선행 조건**: `init` 로 상태 디렉터리가 구성돼 있어야 함.
+- **암호화된 EPUB (`PK...`)**: ZIP 엔트리별 AES-CBC 복호 + PKCS#7 패딩
+  스트립 + zlib inflate → `encryption.xml` 의 Adept 조각 없이 ZIP 재구성.
+  기본 출력: `<input>.nodrm.epub`.
+- **암호화된 PDF (`%PDF-`)**: `/ADEPT_LICENSE` → RSA 언랩 → 객체별 AES
+  복호 → `/Encrypt` 제거하고 재직렬화. 기본 출력: `<input>.nodrm.pdf`.
+
+`-k / --key` 는 선택 사항이다. 우선순위: 명시적 `-k` → `<state_dir>/adobekey.der`
+(`init` 이 심어둠) → 로컬 ADE 설치에서 즉석 추출.
 
 ```bash
-uv run ade-dedrm decrypt -k KEY.der INPUT [-o OUTPUT] [--force]
+# .acsm → DRM-free, 키는 상태 디렉터리에서 자동 조회
+uv run ade-dedrm decrypt ~/Downloads/book.acsm
+
+# 이미 받아둔 DRM EPUB, 명시적 키
+uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.epub
 ```
-
-- 매직 바이트(`PK...` 또는 `%PDF-`)로 입력 형식을 자동 판별
-- **EPUB**: ZIP 엔트리별 AES-CBC 복호 + PKCS#7 패딩 스트립 + zlib inflate
-- **PDF**: `/ADEPT_LICENSE` → RSA 언랩 → 객체별 AES 복호 → `/Encrypt` 제거하고 재직렬화
-- 기본 출력: `<input>.nodrm.<ext>`
-
-### `process` — fulfill + decrypt 원샷 (권장)
-
-```bash
-uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
-```
-
-- `fulfill` 로 암호화된 책을 임시 파일에 받고 즉시 `decrypt` 해서 결과만 남김
-- 중간 결과물 없이 `.acsm` → DRM-free 파일이 한 번에 나옴
-- `-k` 를 생략하면 `init` 이 심어둔 `<state_dir>/adobekey.der` 를 사용
 
 ## 사용 예시
 
@@ -109,7 +103,7 @@ uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
 uv run ade-dedrm init
 
 # 이후 구매한 책은 전부 이 한 줄로
-uv run ade-dedrm process ~/Downloads/새로운책.acsm -o ~/Books/새로운책.epub
+uv run ade-dedrm decrypt ~/Downloads/새로운책.acsm -o ~/Books/새로운책.epub
 ```
 
 ### 이미 다운로드된 DRM 파일 해제
@@ -117,8 +111,11 @@ uv run ade-dedrm process ~/Downloads/새로운책.acsm -o ~/Books/새로운책.e
 `.acsm` 없이 암호화된 EPUB·PDF 파일만 가지고 있다면:
 
 ```bash
+# 명시적 키
 uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.epub
-uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.pdf
+
+# `init` 로 만들어둔 상태 디렉터리의 키를 자동 사용
+uv run ade-dedrm decrypt 암호화된책.pdf
 ```
 
 ### 상태 디렉터리 위치 변경
@@ -128,7 +125,7 @@ uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.pdf
 ```bash
 export ADE_DEDRM_HOME=$(mktemp -d)
 uv run ade-dedrm init
-uv run ade-dedrm process book.acsm
+uv run ade-dedrm decrypt book.acsm
 ```
 
 ## 크로스플랫폼 현황
@@ -138,13 +135,12 @@ uv run ade-dedrm process book.acsm
 
 | 영역 | macOS | Linux | Windows |
 |---|---|---|---|
-| DRM 해제 (`decrypt`) | ✅ | ✅ | ✅ |
-| ACSM fulfillment (`fulfill`/`process`) | ✅ | ✅ | ✅ |
+| `decrypt` (DRM 해제 + ACSM fulfillment) | ✅ | ✅ | ✅ |
 | 상태 bootstrap (`init`) | ✅ | ❌ | ❌ |
 | 상태 bootstrap (`activate`) | 🗓 예정 | 🗓 예정 | 🗓 예정 |
 
 즉 macOS 사용자가 한 번 `init` 로 만든 `~/.config/ade-dedrm/` 를
-다른 OS 기기에 복사하면 거기서도 `fulfill` / `decrypt` 가 그대로 동작한다.
+다른 OS 기기에 복사하면 거기서도 `decrypt` 가 그대로 동작한다.
 
 **완전한 크로스플랫폼 지원 계획**: Tier 3 (`ade-dedrm activate --anonymous` /
 `--adobe-id`) 로 ADE 설치 없이 Adobe 서버에 직접 디바이스를 등록하는 경로를

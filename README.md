@@ -18,9 +18,7 @@
 | Task | Subcommand | Output |
 |---|---|---|
 | Bootstrap state + user key from a local ADE install (macOS) | `init` | state files + `adobekey.der` under `~/.config/ade-dedrm/` |
-| ACSM → encrypted book download | `fulfill` | `.epub` or `.pdf` (still DRM-wrapped) |
-| Remove Adept DRM (EPUB/PDF auto-detected) | `decrypt` | DRM-free file |
-| **`fulfill` + `decrypt` in one shot** | `process` | DRM-free file (recommended) |
+| ACSM fulfillment and/or Adept DRM removal (EPUB/PDF/ACSM auto-detected) | `decrypt` | DRM-free EPUB or PDF |
 
 ## Installation
 
@@ -42,7 +40,7 @@ your Adobe ID:
 uv run ade-dedrm init
 
 # 2. Turn a purchased .acsm into a clean EPUB or PDF in one shot
-uv run ade-dedrm process ~/Downloads/book.acsm
+uv run ade-dedrm decrypt ~/Downloads/book.acsm
 # → ~/Downloads/book.epub (or book.pdf)
 ```
 
@@ -66,52 +64,43 @@ uv run ade-dedrm init [--force] [-o PATH]
   any `-o` target).
 - `-o / --key-output PATH`: also write an extra copy of `adobekey.der`
   to the given path. The canonical copy always lives under the state
-  directory, so `decrypt` / `process` can find it without `-k`.
+  directory, so `decrypt` can find it without `-k`.
 - **State directory location** can be overridden with `$ADE_DEDRM_HOME`
   (default: `$XDG_CONFIG_HOME/ade-dedrm`, falling back to `~/.config/ade-dedrm`).
 
-### `fulfill` — ACSM → encrypted EPUB / PDF
+### `decrypt` — turn an `.acsm` or an Adept-protected EPUB/PDF into a clean file
 
 ```bash
-uv run ade-dedrm fulfill INPUT.acsm [-o OUTPUT] [--force]
+uv run ade-dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
 ```
 
-- Parses the `.acsm` ticket to extract `operatorURL`, then builds an
-  Adobe-style tree-hash + textbook-RSA-signed fulfillment request and
-  POSTs it to the ACS4 server.
-- Downloads the encrypted file from the response and injects either
-  `META-INF/rights.xml` (EPUB) or a patched `/ADEPT_LICENSE` object (PDF)
-  so downstream DRM removal sees a complete Adept-protected file.
-- **The output extension is chosen automatically** based on what the
-  server returned — `.epub` or `.pdf`.
-- The output is still DRM-wrapped; you still need `decrypt` to actually
-  read it.
-- **Precondition**: `init` must have populated the state directory.
+Auto-detects the input by extension / magic bytes and does the right
+thing:
 
-### `decrypt` — remove Adept DRM (EPUB / PDF auto-detected)
+- **`.acsm` fulfillment ticket**: parses the ticket to extract
+  `operatorURL`, builds an Adobe-style tree-hash + textbook-RSA-signed
+  fulfillment request, POSTs it to the ACS4 server, downloads the
+  encrypted book, then immediately decrypts it in memory. No
+  intermediate DRM file is left on disk. Default output is
+  `<input_stem>.<epub|pdf>` based on what the server returned.
+  **Precondition**: `init` must have populated the state directory.
+- **Encrypted EPUB (`PK…`)**: per-entry AES-CBC decrypt → strip PKCS#7
+  padding → zlib inflate → re-pack the ZIP without the Adept bits in
+  `encryption.xml`. Default output: `<input>.nodrm.epub`.
+- **Encrypted PDF (`%PDF-`)**: unwrap the RSA-encrypted book key from
+  `/ADEPT_LICENSE`, decrypt every stream/string object, re-serialize
+  the PDF with `/Encrypt` removed. Default output: `<input>.nodrm.pdf`.
+
+`-k / --key` is optional. Resolution order: explicit `-k` → `<state_dir>/adobekey.der`
+(written by `init`) → on-the-fly extraction from a local ADE install.
 
 ```bash
-uv run ade-dedrm decrypt -k KEY.der INPUT [-o OUTPUT] [--force]
+# .acsm → DRM-free file, key auto-resolved from state dir
+uv run ade-dedrm decrypt ~/Downloads/book.acsm
+
+# already-downloaded DRM file, explicit key
+uv run ade-dedrm decrypt -k ~/adobekey.der encrypted_book.epub
 ```
-
-- Auto-detects the input format from magic bytes (`PK…` or `%PDF-`).
-- **EPUB**: per-entry AES-CBC decrypt → strip PKCS#7 padding → zlib
-  inflate → re-pack the ZIP without the Adept bits in `encryption.xml`.
-- **PDF**: unwrap the RSA-encrypted book key from `/ADEPT_LICENSE`,
-  decrypt every stream/string object, then re-serialize the PDF with
-  `/Encrypt` removed.
-- Default output: `<input>.nodrm.<ext>`.
-
-### `process` — `fulfill` + `decrypt` in one shot (recommended)
-
-```bash
-uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
-```
-
-- Internally runs `fulfill` into a temp file and immediately `decrypt`s
-  it into the final output. No intermediate DRM file is left on disk.
-- `-k` is optional — if omitted, the tool reads
-  `<state_dir>/adobekey.der` (written by `init`).
 
 ## Usage examples
 
@@ -122,7 +111,7 @@ uv run ade-dedrm process INPUT.acsm -k KEY.der [-o OUTPUT] [--force]
 uv run ade-dedrm init
 
 # Every future purchase is a single command
-uv run ade-dedrm process ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
+uv run ade-dedrm decrypt ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
 ```
 
 ### Decrypt files you already downloaded
@@ -130,8 +119,11 @@ uv run ade-dedrm process ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
 If you only have the encrypted file (no `.acsm`):
 
 ```bash
+# Explicit key
 uv run ade-dedrm decrypt -k ~/adobekey.der encrypted_book.epub
-uv run ade-dedrm decrypt -k ~/adobekey.der encrypted_book.pdf
+
+# Or let it pick up the key from the state dir written by `init`
+uv run ade-dedrm decrypt encrypted_book.pdf
 ```
 
 ### Alternate state directory
@@ -141,7 +133,7 @@ Useful for sandboxed tests or multiple activations:
 ```bash
 export ADE_DEDRM_HOME=$(mktemp -d)
 uv run ade-dedrm init
-uv run ade-dedrm process book.acsm
+uv run ade-dedrm decrypt book.acsm
 ```
 
 ## Cross-platform status
@@ -152,14 +144,13 @@ is how the initial state files are obtained:
 
 | Area | macOS | Linux | Windows |
 |---|---|---|---|
-| DRM removal (`decrypt`) | ✅ | ✅ | ✅ |
-| ACSM fulfillment (`fulfill` / `process`) | ✅ | ✅ | ✅ |
+| `decrypt` (DRM removal + ACSM fulfillment) | ✅ | ✅ | ✅ |
 | State bootstrap (`init`) | ✅ | ❌ | ❌ |
 | State bootstrap (`activate`) | 🗓 planned | 🗓 planned | 🗓 planned |
 
 A macOS user can run `init` once and copy the resulting
 `~/.config/ade-dedrm/` directory to any Linux or Windows machine —
-everything downstream of that state will work without changes.
+`decrypt` will work without changes on either side.
 
 **Roadmap to true cross-platform**: Tier 3 adds an `ade-dedrm activate
 --anonymous` / `--adobe-id` subcommand that registers a fresh ADE device
