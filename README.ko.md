@@ -166,9 +166,20 @@ uv run ade-dedrm config show                          # 현재 소스 전체 확
 ```bash
 # 초기 설정 (한 번만)
 uv run ade-dedrm init
+uv run ade-dedrm config setup        # 선택: Calibre Web 접속 정보 저장
 
 # 이후 구매한 책은 전부 이 한 줄로
 uv run ade-dedrm decrypt ~/Downloads/새로운책.acsm -o ~/Books/새로운책.epub
+```
+
+### 복호화 → Calibre Web 업로드 원샷
+
+```bash
+# 복호화 후 Calibre Web 에 업로드하고 로컬 파일은 삭제
+uv run ade-dedrm decrypt ~/Downloads/새로운책.acsm --upload --delete-after-upload
+
+# 이미 변환해 둔 파일 업로드
+uv run ade-dedrm upload ~/Books/예전책.nodrm.epub
 ```
 
 ### 이미 다운로드된 DRM 파일 해제
@@ -191,6 +202,14 @@ uv run ade-dedrm decrypt 암호화된책.pdf
 export ADE_DEDRM_HOME=$(mktemp -d)
 uv run ade-dedrm init
 uv run ade-dedrm decrypt book.acsm
+```
+
+### 현재 크리덴셜 소스 확인
+
+```bash
+uv run ade-dedrm config show
+# → 로더가 보고 있는 .env 파일, 프로세스 환경변수, 그리고 최종 해석된
+#   effective 설정을 한꺼번에 출력 (password 는 *** 로 마스킹).
 ```
 
 ## 크로스플랫폼 현황

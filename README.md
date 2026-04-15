@@ -177,9 +177,20 @@ exact variable names.
 ```bash
 # One-time setup
 uv run ade-dedrm init
+uv run ade-dedrm config setup        # optional: save Calibre Web creds once
 
 # Every future purchase is a single command
 uv run ade-dedrm decrypt ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
+```
+
+### Decrypt + push to Calibre Web in one shot
+
+```bash
+# Decrypt and upload, then delete the local copy
+uv run ade-dedrm decrypt ~/Downloads/new_book.acsm --upload --delete-after-upload
+
+# Upload a file you already decrypted earlier
+uv run ade-dedrm upload ~/Books/old_book.nodrm.epub
 ```
 
 ### Decrypt files you already downloaded
@@ -202,6 +213,14 @@ Useful for sandboxed tests or multiple activations:
 export ADE_DEDRM_HOME=$(mktemp -d)
 uv run ade-dedrm init
 uv run ade-dedrm decrypt book.acsm
+```
+
+### Inspect where credentials are coming from
+
+```bash
+uv run ade-dedrm config show
+# → shows the .env file in use, any process env vars, and the effective
+#   resolved settings (password masked).
 ```
 
 ## Cross-platform status
