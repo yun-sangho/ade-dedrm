@@ -22,7 +22,7 @@ def test_cli_help_runs(capsys: pytest.CaptureFixture[str]) -> None:
     assert exc.value.code == 0
     out = capsys.readouterr().out
     assert "Fulfill ACSM" in out
-    assert "{init,decrypt}" in out
+    assert "{init,decrypt,upload,config}" in out
 
 
 def test_decrypt_subcommand_help(capsys: pytest.CaptureFixture[str]) -> None:

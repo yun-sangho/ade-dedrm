@@ -19,6 +19,8 @@
 |---|---|---|
 | Bootstrap state + user key from a local ADE install (macOS) | `init` | state files + `adobekey.der` under `~/.config/ade-dedrm/` |
 | ACSM fulfillment and/or Adept DRM removal (EPUB/PDF/ACSM auto-detected) | `decrypt` | DRM-free EPUB or PDF |
+| Upload a decrypted EPUB/PDF to a [Calibre Web](https://github.com/janeczku/calibre-web) library | `upload` | new book in your Calibre Web instance |
+| Persist Calibre Web connection details | `config setup` / `config set-calibre` / `config show` | `~/.config/ade-dedrm/.env` (mode 0600) |
 
 ## Installation
 
@@ -100,7 +102,73 @@ uv run ade-dedrm decrypt ~/Downloads/book.acsm
 
 # already-downloaded DRM file, explicit key
 uv run ade-dedrm decrypt -k ~/adobekey.der encrypted_book.epub
+
+# decrypt and push straight to Calibre Web in one shot
+uv run ade-dedrm decrypt ~/Downloads/book.acsm --upload
 ```
+
+### `upload` — push a decrypted file to Calibre Web
+
+```bash
+uv run ade-dedrm upload FILE
+  [--calibre-url URL] [--calibre-username USER] [--calibre-password PASS]
+  [--calibre-no-verify-tls] [--env-file PATH] [--delete-after-upload]
+```
+
+`--delete-after-upload` removes the local file **only after** a
+successful upload. If the upload fails the file is left untouched.
+
+Logs into your [Calibre Web](https://github.com/janeczku/calibre-web)
+instance (scraping the session-bound CSRF token the server requires) and
+POSTs `FILE` as `multipart/form-data` to `/upload`. On success prints
+`Uploaded <name> -> <base-url>/book/<id>`.
+
+The `decrypt --upload` flag runs the exact same upload step right after
+a successful decrypt. If the upload fails, the decrypted file is kept
+on disk so you can retry with a plain `upload`.
+
+### `config` — persist Calibre Web credentials
+
+```bash
+uv run ade-dedrm config setup                         # interactive prompt
+uv run ade-dedrm config set-calibre --url ... --username ...   # scripted
+uv run ade-dedrm config show                          # inspect all sources
+```
+
+All three commands operate on a single file — `~/.config/ade-dedrm/.env`
+(mode `0o600`). There is **no** separate JSON config.
+
+- `config setup` prompts for URL, username, and password one by one.
+  Existing values show as `[defaults]`; press Enter to keep them. The
+  password prompt uses `getpass`, so nothing is echoed to the terminal.
+- `config set-calibre` is the non-interactive form, meant for scripts.
+  Only the fields you pass are rewritten; unrelated lines and comments
+  in the file are preserved.
+- `config show` prints every place the loader is currently seeing
+  credentials — persistent `.env`, process environment, and the
+  resolved effective settings — with passwords masked as `***`.
+
+## Calibre Web credential resolution
+
+When `upload` (or `decrypt --upload`) needs Calibre Web credentials, it
+walks this list in order and takes the **first** value it finds for each
+field:
+
+1. CLI flags (`--calibre-url`, `--calibre-username`, `--calibre-password`,
+   `--calibre-verify-tls` / `--calibre-no-verify-tls`)
+2. Process environment variables:
+   - `ADE_DEDRM_CALIBRE_URL`
+   - `ADE_DEDRM_CALIBRE_USERNAME`
+   - `ADE_DEDRM_CALIBRE_PASSWORD`
+   - `ADE_DEDRM_CALIBRE_VERIFY_TLS` (`false`/`0`/`no`/`off` → off)
+3. A `.env` file. The first of these that exists is loaded:
+   - `--env-file PATH` (explicit)
+   - `./.env` in the current directory
+   - `~/.config/ade-dedrm/.env` (the "persistent" one written by `config`)
+
+Everything missing after that raises a clear error listing the
+unresolved fields. See [`.env.example`](./.env.example) for the
+exact variable names.
 
 ## Usage examples
 
@@ -167,6 +235,7 @@ local ADE install entirely. Detailed plan:
 | 2 | Wrong key / decryption failure |
 | 3 | I/O problem (file missing, refuse-to-overwrite, TTY missing, etc.) |
 | 4 | ACSM fulfillment failed (network, server error, unsupported response) |
+| 5 | Calibre Web upload failed (network, auth, CSRF, role, etc.) |
 
 ## Troubleshooting
 

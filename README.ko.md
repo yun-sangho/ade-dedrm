@@ -17,6 +17,8 @@
 |---|---|---|
 | 로컬 macOS ADE 활성화 + 사용자 키 가져오기 | `init` | `~/.config/ade-dedrm/` 에 상태 파일 + `adobekey.der` |
 | ACSM fulfillment + Adept DRM 해제 (ACSM/EPUB/PDF 자동 판별) | `decrypt` | DRM-free EPUB/PDF |
+| 변환된 EPUB/PDF 를 [Calibre Web](https://github.com/janeczku/calibre-web) 에 업로드 | `upload` | Calibre Web 서재에 새 책 |
+| Calibre Web 접속 정보 저장 | `config setup` / `config set-calibre` / `config show` | `~/.config/ade-dedrm/.env` (권한 0600) |
 
 ## 설치
 
@@ -92,7 +94,70 @@ uv run ade-dedrm decrypt ~/Downloads/book.acsm
 
 # 이미 받아둔 DRM EPUB, 명시적 키
 uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.epub
+
+# 복호화 직후 Calibre Web 에 바로 업로드
+uv run ade-dedrm decrypt ~/Downloads/book.acsm --upload
 ```
+
+### `upload` — 변환된 파일을 Calibre Web 에 업로드
+
+```bash
+uv run ade-dedrm upload FILE
+  [--calibre-url URL] [--calibre-username USER] [--calibre-password PASS]
+  [--calibre-no-verify-tls] [--env-file PATH] [--delete-after-upload]
+```
+
+`--delete-after-upload` 는 **업로드 성공 후에만** 로컬 파일을 삭제한다.
+업로드가 실패하면 파일은 그대로 남는다.
+
+[Calibre Web](https://github.com/janeczku/calibre-web) 인스턴스에 로그인해
+(서버가 요구하는 세션 바인딩 CSRF 토큰을 파싱한 뒤) `FILE` 을
+`multipart/form-data` 로 `/upload` 에 POST 한다. 성공 시
+`Uploaded <name> -> <base-url>/book/<id>` 를 출력한다.
+
+`decrypt --upload` 플래그는 복호화 성공 직후 동일한 업로드 단계를 자동
+실행한다. 업로드가 실패해도 이미 만들어진 복호화 파일은 그대로 남으므로
+`upload` 로 재시도할 수 있다.
+
+### `config` — Calibre Web 접속 정보 저장
+
+```bash
+uv run ade-dedrm config setup                         # 대화형 프롬프트
+uv run ade-dedrm config set-calibre --url ... --username ...   # 스크립트용
+uv run ade-dedrm config show                          # 현재 소스 전체 확인
+```
+
+세 커맨드 모두 **단일 파일** 하나만 읽고 쓴다 — `~/.config/ade-dedrm/.env`
+(권한 `0o600`). 별도의 JSON 설정 파일은 없다.
+
+- `config setup` 은 URL · username · password 를 하나씩 묻는다.
+  기존 값이 있으면 `[default]` 로 표시되고, 엔터만 누르면 유지된다.
+  password 는 `getpass` 로 받아 터미널에 찍히지 않는다.
+- `config set-calibre` 는 같은 파일에 비-대화형으로 저장한다 (스크립트용).
+  전달된 필드만 덮어쓰고, 파일의 다른 변수 / 주석은 그대로 유지된다.
+- `config show` 는 현재 로더가 보고 있는 모든 소스
+  (영구 `.env`, 프로세스 환경변수, 최종 해석된 값) 를 한꺼번에 보여준다.
+  password 는 `***` 로 마스킹된다.
+
+## Calibre Web 크리덴셜 해석 순서
+
+`upload` / `decrypt --upload` 는 각 필드에 대해 아래 목록을 **위에서 아래로**
+돌면서 처음 발견된 값을 사용한다:
+
+1. CLI 플래그 (`--calibre-url`, `--calibre-username`, `--calibre-password`,
+   `--calibre-verify-tls` / `--calibre-no-verify-tls`)
+2. 프로세스 환경변수:
+   - `ADE_DEDRM_CALIBRE_URL`
+   - `ADE_DEDRM_CALIBRE_USERNAME`
+   - `ADE_DEDRM_CALIBRE_PASSWORD`
+   - `ADE_DEDRM_CALIBRE_VERIFY_TLS` (`false`/`0`/`no`/`off` → 검증 끔)
+3. `.env` 파일. 아래 중 **처음으로 존재하는 파일 하나만** 로드한다:
+   - `--env-file PATH` 로 명시된 파일
+   - 현재 디렉터리의 `./.env`
+   - `~/.config/ade-dedrm/.env` (영구 저장 위치, `config` 커맨드가 쓰는 곳)
+
+위 단계를 모두 돌고도 미결인 필드가 있으면 어떤 필드가 비어있는지 명시한
+에러로 종료된다. 변수명 예시는 [`.env.example`](./.env.example) 을 참고.
 
 ## 사용 예시
 
@@ -155,6 +220,7 @@ uv run ade-dedrm decrypt book.acsm
 | 2 | 키 불일치 / 복호화 실패 |
 | 3 | 입력·출력 파일 문제 (존재 안 함, 덮어쓰기 금지 등) |
 | 4 | ACSM fulfillment 실패 (네트워크·서버 에러) |
+| 5 | Calibre Web 업로드 실패 (네트워크·인증·CSRF·권한 등) |
 
 ## Troubleshooting
 
