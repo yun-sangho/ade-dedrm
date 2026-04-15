@@ -14,9 +14,15 @@ dependencies = [
     "pycryptodome>=3.20",
 ]
 
+[project.optional-dependencies]
+mcp = [
+    "mcp>=1.2",
+]
+
 [project.scripts]
 ade-dedrm = "ade_dedrm.cli:main"
 dedrm = "ade_dedrm.cli:main"
+ade-dedrm-mcp = "ade_dedrm.mcpb.server:main"
 
 [dependency-groups]
 dev = [
