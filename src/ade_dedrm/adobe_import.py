@@ -145,11 +145,21 @@ def import_from_ade(state: DeviceState | None = None) -> DeviceState:
         )
     device_fingerprint = _mac_keychain_credential("DeviceFingerprint")
 
-    # Write devicesalt (raw 16 bytes)
+    # Write devicesalt (raw 16 bytes) with restrictive permissions — this is
+    # the AES key that unwraps the pkcs12 private key in activation.xml.
     state.devicesalt.write_bytes(device_key)
+    try:
+        state.devicesalt.chmod(0o600)
+    except OSError:
+        pass
 
-    # Copy activation.dat → activation.xml verbatim
+    # Copy activation.dat → activation.xml verbatim, then restrict perms
+    # (activation.xml contains the pkcs12 blob that wraps the RSA private key).
     shutil.copyfile(source, state.activation_xml)
+    try:
+        state.activation_xml.chmod(0o600)
+    except OSError:
+        pass
 
     # Extract deviceType from the copied activation.xml so our synthetic
     # device.xml matches.
@@ -161,5 +171,9 @@ def import_from_ade(state: DeviceState | None = None) -> DeviceState:
 
     fingerprint_b64 = base64.b64encode(device_fingerprint)
     state.device_xml.write_text(_build_device_xml(device_type, fingerprint_b64), encoding="utf-8")
+    try:
+        state.device_xml.chmod(0o600)
+    except OSError:
+        pass
 
     return state
