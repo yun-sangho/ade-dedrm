@@ -12,6 +12,10 @@
   [acsm-calibre-plugin (DeACSM)](https://github.com/Leseratte10/acsm-calibre-plugin).
 - No Calibre plugin required. Runs anywhere Python 3.12 runs — scripts,
   cron jobs, headless servers, CI.
+- **Non-developer friendly**: also ships as a [Claude Desktop MCP
+  Bundle](./README.mcpb.md) — double-click a `.mcpb` file to install,
+  then drive everything through natural-language chat (no terminal, no
+  JSON editing, no runtime install).
 
 ## Features
 

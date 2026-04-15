@@ -1,0 +1,100 @@
+{
+  "manifest_version": "0.4",
+  "name": "ade-dedrm",
+  "display_name": "ADE DeDRM",
+  "version": "0.1.0",
+  "description": "Remove Adobe Digital Editions DRM from purchased EPUB/PDF books and optionally upload them to Calibre Web.",
+  "long_description": "Fulfills Adobe ACSM tickets, strips Adept DRM from EPUB/PDF files, and optionally uploads the decrypted result to a self-hosted Calibre Web instance. Designed to be driven entirely through natural-language tool calls from an MCP host such as Claude Desktop, so non-developer users never need to touch a terminal.\n\nThis is a personal-use tool. You are responsible for only using it on books you have legitimately purchased and are backing up for your own accessibility needs.",
+  "author": {
+    "name": "yun-sangho",
+    "email": "contact@yunsangho.com"
+  },
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/yun-sangho/ade-dedrm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yun-sangho/ade-dedrm.git"
+  },
+  "keywords": [
+    "adobe",
+    "adept",
+    "drm",
+    "epub",
+    "pdf",
+    "acsm",
+    "calibre"
+  ],
+  "server": {
+    "type": "uv",
+    "entry_point": "src/ade_dedrm/mcpb/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "--extra",
+        "mcp",
+        "python",
+        "-m",
+        "ade_dedrm.mcpb.server"
+      ],
+      "env": {
+        "ADE_DEDRM_CALIBRE_URL": "${user_config.calibre_url}",
+        "ADE_DEDRM_CALIBRE_USERNAME": "${user_config.calibre_username}",
+        "ADE_DEDRM_CALIBRE_PASSWORD": "${user_config.calibre_password}",
+        "ADE_DEDRM_CALIBRE_VERIFY_TLS": "${user_config.calibre_verify_tls}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "status",
+      "description": "Check whether ade-dedrm state and Calibre Web settings are ready. Returns only booleans and the Calibre hostname (never credentials)."
+    },
+    {
+      "name": "bootstrap_ade",
+      "description": "Import Adobe Digital Editions activation state from the local install. macOS only. Triggers a macOS keychain prompt on first call; warn the user before invoking."
+    },
+    {
+      "name": "decrypt",
+      "description": "Fulfill an .acsm ticket and/or strip Adept DRM from an .epub or .pdf file. Auto-detects input type. Requires bootstrap_ade() to have succeeded."
+    },
+    {
+      "name": "upload_calibre",
+      "description": "Upload an already-decrypted .epub or .pdf to the configured Calibre Web instance. Requires Calibre URL/username/password to be set in user_config."
+    }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "linux", "win32"],
+    "python": ">=3.12,<3.13"
+  },
+  "user_config": {
+    "calibre_url": {
+      "type": "string",
+      "title": "Calibre Web URL",
+      "description": "Base URL of your self-hosted Calibre Web instance (e.g. https://calibre.example.com). Leave blank if you do not use Calibre Web.",
+      "required": false
+    },
+    "calibre_username": {
+      "type": "string",
+      "title": "Calibre Web Username",
+      "description": "The username that has the 'upload' role on your Calibre Web instance.",
+      "required": false
+    },
+    "calibre_password": {
+      "type": "string",
+      "title": "Calibre Web Password",
+      "description": "Stored securely by the host application and passed to the server via an environment variable. Never shown to the AI assistant.",
+      "sensitive": true,
+      "required": false
+    },
+    "calibre_verify_tls": {
+      "type": "boolean",
+      "title": "Verify Calibre Web TLS Certificate",
+      "description": "Turn off only if your Calibre Web uses a self-signed certificate and you understand the risk.",
+      "default": true,
+      "required": false
+    }
+  }
+}
