@@ -1,0 +1,110 @@
+name: Bump Homebrew formula
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to bump to (e.g. v0.1.2)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG / version: $VERSION"
+
+      - name: Compute tarball SHA-256
+        id: tarball
+        run: |
+          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${{ steps.tag.outputs.tag }}.tar.gz"
+          # Retry a few times — GitHub may take a moment to build the tarball.
+          for i in 1 2 3 4 5; do
+            SHA=$(curl -fsSL "$URL" | shasum -a 256 | awk '{print $1}') && break
+            echo "attempt $i failed, retrying..."
+            sleep 5
+          done
+          if [ -z "$SHA" ]; then
+            echo "error: could not fetch/hash $URL" >&2
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "URL: $URL"
+          echo "SHA: $SHA"
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: yun-sangho/homebrew-tap
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: Update Formula
+        working-directory: tap
+        env:
+          NEW_URL: ${{ steps.tarball.outputs.url }}
+          NEW_SHA: ${{ steps.tarball.outputs.sha }}
+        run: |
+          FORMULA=Formula/dedrm.rb
+          echo "--- before ---"
+          grep -E '^\s*(url|sha256)\s+' "$FORMULA"
+
+          # Replace url "..." and sha256 "..." lines. Using | as sed delimiter
+          # since URLs contain /.
+          sed -i -E \
+            -e "s|^(\\s*url\\s+)\"[^\"]*\"|\\1\"$NEW_URL\"|" \
+            -e "s|^(\\s*sha256\\s+)\"[^\"]*\"|\\1\"$NEW_SHA\"|" \
+            "$FORMULA"
+
+          # Also strip any existing bottle block — old bottles are invalid
+          # for the new version; Level 2 workflow will re-add them.
+          python3 <<'PY'
+          import re, pathlib
+          p = pathlib.Path("Formula/dedrm.rb")
+          text = p.read_text()
+          # Remove a bottle do ... end block (indented).
+          new = re.sub(
+              r'^\s*bottle\s+do\b.*?^\s*end\s*\n',
+              '',
+              text,
+              flags=re.M | re.S,
+          )
+          p.write_text(new)
+          PY
+
+          echo "--- after ---"
+          grep -E '^\s*(url|sha256)\s+' "$FORMULA"
+          echo "--- diff ---"
+          git diff --no-color "$FORMULA" || true
+
+      - name: Commit and push
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet Formula/dedrm.rb; then
+            echo "Formula already at ${{ steps.tag.outputs.tag }} — nothing to do."
+            exit 0
+          fi
+
+          git add Formula/dedrm.rb
+          git commit -m "dedrm: bump to ${{ steps.tag.outputs.version }}"
+          git push

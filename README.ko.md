@@ -20,15 +20,16 @@
 | 변환된 EPUB/PDF 를 [Calibre Web](https://github.com/janeczku/calibre-web) 에 업로드 | `upload` | Calibre Web 서재에 새 책 |
 | Calibre Web 접속 정보 저장 | `config setup` / `config set-calibre` / `config show` | `~/.config/ade-dedrm/.env` (권한 0600) |
 
-## 설치
+## Homebrew 로 설치 (macOS)
 
 ```bash
-git clone https://github.com/yun-sangho/ade-dedrm.git
-cd ade-dedrm
-uv sync
+brew install yun-sangho/tap/dedrm
+dedrm --help
 ```
 
-Python 3.12가 필요하다. `uv`가 자동으로 설치·고정한다.
+Formula 가 Homebrew prefix 아래에 격리된 Python 3.12 가상환경을 만들고
+`dedrm` / `ade-dedrm` 두 명령을 PATH 에 노출한다. 첫 설치 시
+`cryptography` 의 Rust 확장이 컴파일되며 1–2 분 정도 걸린다.
 
 ## 빠른 시작 (macOS)
 
@@ -36,10 +37,10 @@ Python 3.12가 필요하다. `uv`가 자동으로 설치·고정한다.
 
 ```bash
 # 1. ADE 활성화 상태 + 사용자 키를 한 번에 가져옴
-uv run ade-dedrm init
+dedrm init
 
 # 2. 구매한 .acsm 파일을 원샷으로 DRM-free 파일로 변환
-uv run ade-dedrm decrypt ~/Downloads/book.acsm
+dedrm decrypt ~/Downloads/book.acsm
 # → ~/Downloads/book.epub (또는 book.pdf)
 ```
 
@@ -53,7 +54,7 @@ macOS 키체인의 `DeviceKey` / `DeviceFingerprint`를 조합해
 를 한 번에 만든다.
 
 ```bash
-uv run ade-dedrm init [--force] [-o PATH]
+dedrm init [--force] [-o PATH]
 ```
 
 - **선행 조건**: macOS에 ADE가 설치돼 있고 Help → Authorize Computer 로 본인 계정 인증 완료
@@ -68,7 +69,7 @@ uv run ade-dedrm init [--force] [-o PATH]
 ### `decrypt` — `.acsm` 또는 Adept DRM EPUB/PDF → DRM-free 파일
 
 ```bash
-uv run ade-dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
+dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
 ```
 
 입력 파일 종류(확장자 / 매직 바이트)를 자동 판별해 알맞은 경로로 실행한다:
@@ -90,19 +91,19 @@ uv run ade-dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
 
 ```bash
 # .acsm → DRM-free, 키는 상태 디렉터리에서 자동 조회
-uv run ade-dedrm decrypt ~/Downloads/book.acsm
+dedrm decrypt ~/Downloads/book.acsm
 
 # 이미 받아둔 DRM EPUB, 명시적 키
-uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.epub
+dedrm decrypt -k ~/adobekey.der 암호화된책.epub
 
 # 복호화 직후 Calibre Web 에 바로 업로드
-uv run ade-dedrm decrypt ~/Downloads/book.acsm --upload
+dedrm decrypt ~/Downloads/book.acsm --upload
 ```
 
 ### `upload` — 변환된 파일을 Calibre Web 에 업로드
 
 ```bash
-uv run ade-dedrm upload FILE
+dedrm upload FILE
   [--calibre-url URL] [--calibre-username USER] [--calibre-password PASS]
   [--calibre-no-verify-tls] [--env-file PATH] [--delete-after-upload]
 ```
@@ -122,9 +123,9 @@ uv run ade-dedrm upload FILE
 ### `config` — Calibre Web 접속 정보 저장
 
 ```bash
-uv run ade-dedrm config setup                         # 대화형 프롬프트
-uv run ade-dedrm config set-calibre --url ... --username ...   # 스크립트용
-uv run ade-dedrm config show                          # 현재 소스 전체 확인
+dedrm config setup                         # 대화형 프롬프트
+dedrm config set-calibre --url ... --username ...   # 스크립트용
+dedrm config show                          # 현재 소스 전체 확인
 ```
 
 세 커맨드 모두 **단일 파일** 하나만 읽고 쓴다 — `~/.config/ade-dedrm/.env`
@@ -165,21 +166,21 @@ uv run ade-dedrm config show                          # 현재 소스 전체 확
 
 ```bash
 # 초기 설정 (한 번만)
-uv run ade-dedrm init
-uv run ade-dedrm config setup        # 선택: Calibre Web 접속 정보 저장
+dedrm init
+dedrm config setup        # 선택: Calibre Web 접속 정보 저장
 
 # 이후 구매한 책은 전부 이 한 줄로
-uv run ade-dedrm decrypt ~/Downloads/새로운책.acsm -o ~/Books/새로운책.epub
+dedrm decrypt ~/Downloads/새로운책.acsm -o ~/Books/새로운책.epub
 ```
 
 ### 복호화 → Calibre Web 업로드 원샷
 
 ```bash
 # 복호화 후 Calibre Web 에 업로드하고 로컬 파일은 삭제
-uv run ade-dedrm decrypt ~/Downloads/새로운책.acsm --upload --delete-after-upload
+dedrm decrypt ~/Downloads/새로운책.acsm --upload --delete-after-upload
 
 # 이미 변환해 둔 파일 업로드
-uv run ade-dedrm upload ~/Books/예전책.nodrm.epub
+dedrm upload ~/Books/예전책.nodrm.epub
 ```
 
 ### 이미 다운로드된 DRM 파일 해제
@@ -188,10 +189,10 @@ uv run ade-dedrm upload ~/Books/예전책.nodrm.epub
 
 ```bash
 # 명시적 키
-uv run ade-dedrm decrypt -k ~/adobekey.der 암호화된책.epub
+dedrm decrypt -k ~/adobekey.der 암호화된책.epub
 
 # `init` 로 만들어둔 상태 디렉터리의 키를 자동 사용
-uv run ade-dedrm decrypt 암호화된책.pdf
+dedrm decrypt 암호화된책.pdf
 ```
 
 ### 상태 디렉터리 위치 변경
@@ -200,14 +201,14 @@ uv run ade-dedrm decrypt 암호화된책.pdf
 
 ```bash
 export ADE_DEDRM_HOME=$(mktemp -d)
-uv run ade-dedrm init
-uv run ade-dedrm decrypt book.acsm
+dedrm init
+dedrm decrypt book.acsm
 ```
 
 ### 현재 크리덴셜 소스 확인
 
 ```bash
-uv run ade-dedrm config show
+dedrm config show
 # → 로더가 보고 있는 .env 파일, 프로세스 환경변수, 그리고 최종 해석된
 #   effective 설정을 한꺼번에 출력 (password 는 *** 로 마스킹).
 ```
@@ -264,7 +265,22 @@ Google 서버의 거부다. `play.google.com/books` → 설정 → 기기 관리
 해당 PDF는 Adept DRM이 아니라 다른 보호 방식(Apple FairPlay, Amazon 등)이다.
 이 도구 범위 밖.
 
-## 테스트
+## 개발 환경
+
+로컬 체크아웃은 [uv](https://github.com/astral-sh/uv) 로 dev 가상환경을
+만든다. **일반 사용자는 uv 가 필요 없고, 기여자만 쓰면 된다.**
+
+```bash
+git clone https://github.com/yun-sangho/ade-dedrm.git
+cd ade-dedrm
+uv sync
+```
+
+Python 3.12 가 필요하며 `uv` 가 자동으로 설치·고정한다. dev 체크아웃
+안에서 위의 모든 예시 앞에 `uv run` 을 붙이면 (예: `uv run dedrm decrypt …`)
+시스템 설치본 대신 워크트리의 editable 설치본이 실행된다.
+
+### 테스트
 
 ```bash
 uv run pytest tests/ -q
