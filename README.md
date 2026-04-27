@@ -22,15 +22,17 @@
 | Upload a decrypted EPUB/PDF to a [Calibre Web](https://github.com/janeczku/calibre-web) library | `upload` | new book in your Calibre Web instance |
 | Persist Calibre Web connection details | `config setup` / `config set-calibre` / `config show` | `~/.config/ade-dedrm/.env` (mode 0600) |
 
-## Installation
+## Install via Homebrew (macOS)
 
 ```bash
-git clone https://github.com/yun-sangho/ade-dedrm.git
-cd ade-dedrm
-uv sync
+brew install yun-sangho/tap/dedrm
+dedrm --help
 ```
 
-Python 3.12 is required. `uv` installs and pins it automatically.
+The formula installs an isolated Python 3.12 virtualenv under Homebrew's
+prefix and exposes both the `dedrm` and `ade-dedrm` commands on `PATH`.
+First-time install compiles the `cryptography` Rust extension, which
+takes 1–2 minutes.
 
 ## Quick start (macOS)
 
@@ -39,10 +41,10 @@ your Adobe ID:
 
 ```bash
 # 1. Bootstrap state + user key from your local ADE install (run once)
-uv run ade-dedrm init
+dedrm init
 
 # 2. Turn a purchased .acsm into a clean EPUB or PDF in one shot
-uv run ade-dedrm decrypt ~/Downloads/book.acsm
+dedrm decrypt ~/Downloads/book.acsm
 # → ~/Downloads/book.epub (or book.pdf)
 ```
 
@@ -56,7 +58,7 @@ keychain, producing `~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml
 in one shot.
 
 ```bash
-uv run ade-dedrm init [--force] [-o PATH]
+dedrm init [--force] [-o PATH]
 ```
 
 - **Precondition**: ADE is installed and you have already completed
@@ -73,7 +75,7 @@ uv run ade-dedrm init [--force] [-o PATH]
 ### `decrypt` — turn an `.acsm` or an Adept-protected EPUB/PDF into a clean file
 
 ```bash
-uv run ade-dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
+dedrm decrypt INPUT [-k KEY.der] [-o OUTPUT] [--force]
 ```
 
 Auto-detects the input by extension / magic bytes and does the right
@@ -98,19 +100,19 @@ thing:
 
 ```bash
 # .acsm → DRM-free file, key auto-resolved from state dir
-uv run ade-dedrm decrypt ~/Downloads/book.acsm
+dedrm decrypt ~/Downloads/book.acsm
 
 # already-downloaded DRM file, explicit key
-uv run ade-dedrm decrypt -k ~/adobekey.der encrypted_book.epub
+dedrm decrypt -k ~/adobekey.der encrypted_book.epub
 
 # decrypt and push straight to Calibre Web in one shot
-uv run ade-dedrm decrypt ~/Downloads/book.acsm --upload
+dedrm decrypt ~/Downloads/book.acsm --upload
 ```
 
 ### `upload` — push a decrypted file to Calibre Web
 
 ```bash
-uv run ade-dedrm upload FILE
+dedrm upload FILE
   [--calibre-url URL] [--calibre-username USER] [--calibre-password PASS]
   [--calibre-no-verify-tls] [--env-file PATH] [--delete-after-upload]
 ```
@@ -130,9 +132,9 @@ on disk so you can retry with a plain `upload`.
 ### `config` — persist Calibre Web credentials
 
 ```bash
-uv run ade-dedrm config setup                         # interactive prompt
-uv run ade-dedrm config set-calibre --url ... --username ...   # scripted
-uv run ade-dedrm config show                          # inspect all sources
+dedrm config setup                         # interactive prompt
+dedrm config set-calibre --url ... --username ...   # scripted
+dedrm config show                          # inspect all sources
 ```
 
 All three commands operate on a single file — `~/.config/ade-dedrm/.env`
@@ -176,21 +178,21 @@ exact variable names.
 
 ```bash
 # One-time setup
-uv run ade-dedrm init
-uv run ade-dedrm config setup        # optional: save Calibre Web creds once
+dedrm init
+dedrm config setup        # optional: save Calibre Web creds once
 
 # Every future purchase is a single command
-uv run ade-dedrm decrypt ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
+dedrm decrypt ~/Downloads/new_book.acsm -o ~/Books/new_book.epub
 ```
 
 ### Decrypt + push to Calibre Web in one shot
 
 ```bash
 # Decrypt and upload, then delete the local copy
-uv run ade-dedrm decrypt ~/Downloads/new_book.acsm --upload --delete-after-upload
+dedrm decrypt ~/Downloads/new_book.acsm --upload --delete-after-upload
 
 # Upload a file you already decrypted earlier
-uv run ade-dedrm upload ~/Books/old_book.nodrm.epub
+dedrm upload ~/Books/old_book.nodrm.epub
 ```
 
 ### Decrypt files you already downloaded
@@ -199,10 +201,10 @@ If you only have the encrypted file (no `.acsm`):
 
 ```bash
 # Explicit key
-uv run ade-dedrm decrypt -k ~/adobekey.der encrypted_book.epub
+dedrm decrypt -k ~/adobekey.der encrypted_book.epub
 
 # Or let it pick up the key from the state dir written by `init`
-uv run ade-dedrm decrypt encrypted_book.pdf
+dedrm decrypt encrypted_book.pdf
 ```
 
 ### Alternate state directory
@@ -211,14 +213,14 @@ Useful for sandboxed tests or multiple activations:
 
 ```bash
 export ADE_DEDRM_HOME=$(mktemp -d)
-uv run ade-dedrm init
-uv run ade-dedrm decrypt book.acsm
+dedrm init
+dedrm decrypt book.acsm
 ```
 
 ### Inspect where credentials are coming from
 
 ```bash
-uv run ade-dedrm config show
+dedrm config show
 # → shows the .env file in use, any process env vars, and the effective
 #   resolved settings (password masked).
 ```
@@ -289,7 +291,23 @@ against the `activation.dat` that belongs to the same Adobe ID.
 That PDF isn't Adept-protected — it's using a different scheme (Apple
 FairPlay, Amazon, a password handler, etc.). Out of scope for this tool.
 
-## Testing
+## Development
+
+Local checkout uses [uv](https://github.com/astral-sh/uv) for the dev
+virtualenv. End users do not need uv — only contributors do.
+
+```bash
+git clone https://github.com/yun-sangho/ade-dedrm.git
+cd ade-dedrm
+uv sync
+```
+
+Python 3.12 is required; `uv` installs and pins it automatically. Inside
+the dev checkout, prefix any command above with `uv run` (e.g.
+`uv run dedrm decrypt …`) to use the worktree's editable install instead
+of a system one.
+
+### Tests
 
 ```bash
 uv run pytest tests/ -q
