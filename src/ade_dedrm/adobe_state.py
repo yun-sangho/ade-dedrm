@@ -18,9 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from Crypto.Cipher import AES
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.serialization import pkcs12 as crypto_pkcs12
 from lxml import etree
+from oscrypto import keys as oscrypto_keys
 
 ADEPT_NS = "http://ns.adobe.com/adept"
 NSMAP = {"adept": ADEPT_NS}
@@ -101,15 +100,11 @@ def load_pkcs12_private_key_der(state: DeviceState) -> bytes:
     pkcs12_bytes = base64.b64decode(pkcs12_b64.text)
     password = base64.b64encode(state.load_devicesalt())
 
-    key, _cert, _extra = crypto_pkcs12.load_key_and_certificates(pkcs12_bytes, password)
-    if key is None:
+    key_info, _cert, _extra = oscrypto_keys.parse_pkcs12(pkcs12_bytes, password)
+    if key_info is None:
         raise RuntimeError("Failed to decrypt pkcs12 private key")
 
-    return key.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
+    return key_info.dump()
 
 
 def load_pkcs12_cert_der(state: DeviceState) -> bytes:
@@ -121,11 +116,11 @@ def load_pkcs12_cert_der(state: DeviceState) -> bytes:
     pkcs12_bytes = base64.b64decode(pkcs12_b64.text)
     password = base64.b64encode(state.load_devicesalt())
 
-    _key, cert, _extra = crypto_pkcs12.load_key_and_certificates(pkcs12_bytes, password)
+    _key, cert, _extra = oscrypto_keys.parse_pkcs12(pkcs12_bytes, password)
     if cert is None:
         raise RuntimeError("Failed to decrypt pkcs12 certificate")
 
-    return cert.public_bytes(serialization.Encoding.DER)
+    return cert.dump()
 
 
 def save_activation(state: DeviceState, tree: etree._ElementTree) -> None:
