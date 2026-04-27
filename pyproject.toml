@@ -1,6 +1,6 @@
 [project]
 name = "ade-dedrm"
-version = "0.1.2"
+version = "0.1.3"
 description = "CLI to remove Adobe Digital Editions (Adept) DRM from ePub files."
 readme = "README.md"
 authors = [
@@ -9,8 +9,9 @@ authors = [
 requires-python = ">=3.12,<3.13"
 license = { text = "GPL-3.0-or-later" }
 dependencies = [
-    "cryptography>=42",
+    "asn1crypto>=1.5",
     "lxml>=5.0",
+    "oscrypto>=1.3",
     "pycryptodome>=3.20",
 ]
 
@@ -20,6 +21,7 @@ dedrm = "ade_dedrm.cli:main"
 
 [dependency-groups]
 dev = [
+    "cryptography>=42",
     "pytest>=8.0",
 ]
 
