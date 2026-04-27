@@ -5,8 +5,9 @@ from __future__ import annotations
 import base64
 import hashlib
 
+import xml.etree.ElementTree as etree
+
 from Crypto.PublicKey import RSA
-from lxml import etree
 
 from ade_dedrm.adobe_sign import (
     ADEPT_NS,

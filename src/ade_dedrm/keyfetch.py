@@ -11,7 +11,7 @@ import sys
 from base64 import b64decode
 from pathlib import Path
 
-from lxml import etree
+import xml.etree.ElementTree as etree
 
 NSMAP = {"adept": "http://ns.adobe.com/adept"}
 
