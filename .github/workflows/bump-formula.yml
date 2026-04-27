@@ -66,11 +66,15 @@ jobs:
           echo "--- before ---"
           grep -E '^\s*(url|sha256)\s+' "$FORMULA"
 
-          # Replace url "..." and sha256 "..." lines. Using | as sed delimiter
+          # Replace ONLY the top-level Formula's url/sha256 — i.e. the first
+          # url/sha256 lines in the file. Resource blocks (inside `resource
+          # "<dep>" do ... end`) also have url/sha256 lines pointing at PyPI
+          # tarballs, and those must not be touched. The `0,/pat/` sed range
+          # limits substitution to the first match. Using | as delimiter
           # since URLs contain /.
           sed -i -E \
-            -e "s|^(\\s*url\\s+)\"[^\"]*\"|\\1\"$NEW_URL\"|" \
-            -e "s|^(\\s*sha256\\s+)\"[^\"]*\"|\\1\"$NEW_SHA\"|" \
+            -e "0,/^(\\s*url\\s+)\"[^\"]*\"/{s|^(\\s*url\\s+)\"[^\"]*\"|\\1\"$NEW_URL\"|}" \
+            -e "0,/^(\\s*sha256\\s+)\"[^\"]*\"/{s|^(\\s*sha256\\s+)\"[^\"]*\"|\\1\"$NEW_SHA\"|}" \
             "$FORMULA"
 
           # Also strip any existing bottle block — old bottles are invalid
