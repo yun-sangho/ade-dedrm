@@ -15,7 +15,7 @@ from __future__ import annotations
 import base64
 from datetime import datetime, timedelta
 
-from lxml import etree
+import xml.etree.ElementTree as etree
 
 from ade_dedrm.adobe_http import AdeptHTTPError, get_adept, post_adept
 from ade_dedrm.adobe_sign import ADEPT_NS, sign_node
@@ -26,7 +26,9 @@ from ade_dedrm.adobe_state import (
     save_activation,
 )
 
-NSMAP = {"adept": ADEPT_NS}
+# Register the adept prefix so etree.tostring serialises new elements
+# with `xmlns:adept="..."` instead of stdlib's default `ns0:` placeholders.
+etree.register_namespace("adept", ADEPT_NS)
 
 
 def _adept(tag: str) -> str:
@@ -59,7 +61,8 @@ def _sign_and_serialize(xml_str: str, state: DeviceState) -> str:
     priv_der = load_pkcs12_private_key_der(state)
     sig = sign_node(root, priv_der)
     etree.SubElement(root, etree.QName(ADEPT_NS, "signature")).text = sig
-    body = etree.tostring(root, encoding="utf-8", pretty_print=True).decode("utf-8")
+    etree.indent(root, space="  ")
+    body = etree.tostring(root, encoding="utf-8").decode("utf-8")
     return '<?xml version="1.0"?>\n' + body
 
 
@@ -117,12 +120,12 @@ def _get_device_identity(state: DeviceState) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _build_fulfill_request(state: DeviceState, acsm_tree: etree._ElementTree) -> str:
+def _build_fulfill_request(state: DeviceState, acsm_tree: etree.ElementTree) -> str:
     ident = _get_device_identity(state)
 
-    acsm_body = etree.tostring(
-        acsm_tree.getroot(), encoding="utf-8", pretty_print=True
-    ).decode("utf-8")
+    acsm_root = acsm_tree.getroot()
+    etree.indent(acsm_root, space="  ")
+    acsm_body = etree.tostring(acsm_root, encoding="utf-8").decode("utf-8")
 
     return (
         '<?xml version="1.0"?>'
@@ -231,7 +234,7 @@ def _ensure_operator_auth(state: DeviceState, operator_url: str) -> None:
     url_list = activation.find(f"./{_adept('operatorURLList')}")
     if url_list is None:
         url_list = etree.SubElement(
-            activation.getroot(), etree.QName(ADEPT_NS, "operatorURLList"), nsmap=NSMAP
+            activation.getroot(), etree.QName(ADEPT_NS, "operatorURLList")
         )
         user_uuid = activation.find(
             f"./{_adept('credentials')}/{_adept('user')}"
@@ -274,7 +277,7 @@ def _fetch_license_service_cert(
     services_el = activation.find(f"./{_adept('licenseServices')}")
     if services_el is None:
         services_el = etree.SubElement(
-            activation.getroot(), etree.QName(ADEPT_NS, "licenseServices"), nsmap=NSMAP
+            activation.getroot(), etree.QName(ADEPT_NS, "licenseServices")
         )
     info_el = etree.SubElement(services_el, etree.QName(ADEPT_NS, "licenseServiceInfo"))
     etree.SubElement(info_el, etree.QName(ADEPT_NS, "licenseURL")).text = server_url_el.text
@@ -296,7 +299,7 @@ def fulfill(state: DeviceState, acsm_path) -> bytes:
     """
     try:
         acsm_tree = etree.parse(str(acsm_path))
-    except etree.XMLSyntaxError as exc:
+    except etree.ParseError as exc:
         raise FulfillmentError(f"Could not parse ACSM file: {exc}") from exc
 
     operator_url_el = acsm_tree.find(f"./{_adept('operatorURL')}")

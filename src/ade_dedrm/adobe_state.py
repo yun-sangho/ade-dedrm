@@ -17,12 +17,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+import xml.etree.ElementTree as etree
+
 from Crypto.Cipher import AES
-from lxml import etree
 from oscrypto import keys as oscrypto_keys
 
 ADEPT_NS = "http://ns.adobe.com/adept"
-NSMAP = {"adept": ADEPT_NS}
+etree.register_namespace("adept", ADEPT_NS)
 
 
 def _adept(tag: str) -> str:
@@ -71,10 +72,10 @@ class DeviceState:
     def load_devicesalt(self) -> bytes:
         return self.devicesalt.read_bytes()
 
-    def load_activation(self) -> etree._ElementTree:
+    def load_activation(self) -> etree.ElementTree:
         return etree.parse(str(self.activation_xml))
 
-    def load_device(self) -> etree._ElementTree:
+    def load_device(self) -> etree.ElementTree:
         return etree.parse(str(self.device_xml))
 
 
@@ -123,8 +124,8 @@ def load_pkcs12_cert_der(state: DeviceState) -> bytes:
     return cert.dump()
 
 
-def save_activation(state: DeviceState, tree: etree._ElementTree) -> None:
-    xml = etree.tostring(
-        tree, encoding="utf-8", pretty_print=True, xml_declaration=False
-    ).decode("utf-8")
+def save_activation(state: DeviceState, tree: etree.ElementTree) -> None:
+    root = tree.getroot()
+    etree.indent(root, space="  ")
+    xml = etree.tostring(root, encoding="utf-8").decode("utf-8")
     state.activation_xml.write_text('<?xml version="1.0"?>\n' + xml, encoding="utf-8")

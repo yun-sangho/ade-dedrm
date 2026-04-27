@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lxml import etree
+import xml.etree.ElementTree as etree
 
 from ade_dedrm.adobe_state import ADEPT_NS, DeviceState, state_dir
 

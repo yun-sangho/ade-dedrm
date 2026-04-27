@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import base64
 
+import xml.etree.ElementTree as etree
+
 from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
-from lxml import etree
 
 ASN_NS_TAG = 1
 ASN_CHILD = 2
@@ -23,6 +24,18 @@ ASN_TEXT = 4
 ASN_ATTRIBUTE = 5
 
 ADEPT_NS = "http://ns.adobe.com/adept"
+
+
+def _split_clark(tag: str) -> tuple[str, str]:
+    """Split a Clark-notation tag '{namespace}localname' into (ns, local).
+
+    stdlib's etree.QName cannot decompose; lxml's QName can. We split
+    manually so the tree-hash code stays readable.
+    """
+    if tag.startswith("{"):
+        ns_end = tag.index("}")
+        return tag[1:ns_end], tag[ns_end + 1 :]
+    return "", tag
 
 
 def _append_raw(hash_ctx, data: bytes) -> None:
@@ -42,27 +55,26 @@ def _append_string(hash_ctx, string: str) -> None:
     _append_raw(hash_ctx, data)
 
 
-def _hash_node(node: etree._Element, hash_ctx) -> None:
-    qtag = etree.QName(node.tag)
+def _hash_node(node: etree.Element, hash_ctx) -> None:
+    namespace, localname = _split_clark(node.tag)
 
     # Adobe excludes hmac and signature nodes (in the adept namespace) from
     # the hash so that a signature can be verified *including* the signature
     # element itself.
-    if qtag.localname in ("hmac", "signature") and qtag.namespace == ADEPT_NS:
+    if localname in ("hmac", "signature") and namespace == ADEPT_NS:
         return
 
     _append_tag(hash_ctx, ASN_NS_TAG)
-    _append_string(hash_ctx, qtag.namespace or "")
-    _append_string(hash_ctx, qtag.localname)
+    _append_string(hash_ctx, namespace)
+    _append_string(hash_ctx, localname)
 
-    # Attributes must be sorted. Adobe specifies bytewise UTF-8 sort; lxml
-    # already stores attribute keys in insertion order, so we sort on the
-    # serialized Clark name which is a reasonable approximation.
+    # Attributes must be sorted. Adobe specifies bytewise UTF-8 sort; sort
+    # on the Clark serialization which is a reasonable approximation.
     for attr in sorted(node.keys()):
         _append_tag(hash_ctx, ASN_ATTRIBUTE)
-        qattr = etree.QName(attr)
-        _append_string(hash_ctx, qattr.namespace or "")
-        _append_string(hash_ctx, qattr.localname)
+        attr_ns, attr_local = _split_clark(attr)
+        _append_string(hash_ctx, attr_ns)
+        _append_string(hash_ctx, attr_local)
         _append_string(hash_ctx, node.get(attr))
 
     _append_tag(hash_ctx, ASN_CHILD)
@@ -84,7 +96,7 @@ def _hash_node(node: etree._Element, hash_ctx) -> None:
     _append_tag(hash_ctx, ASN_END_TAG)
 
 
-def hash_node(node: etree._Element) -> bytes:
+def hash_node(node: etree.Element) -> bytes:
     """Return the SHA-1 digest of an XML node using Adobe's tree hash format."""
     ctx = SHA.new()
     _hash_node(node, ctx)
@@ -121,7 +133,7 @@ def textbook_rsa_sign(private_key_der: bytes, message: bytes) -> bytes:
     return c_int.to_bytes(key_len, "big")
 
 
-def sign_node(node: etree._Element, private_key_der: bytes) -> str:
+def sign_node(node: etree.Element, private_key_der: bytes) -> str:
     """Return a base64-encoded Adobe signature for the given node."""
     digest = hash_node(node)
     signature = textbook_rsa_sign(private_key_der, digest)

@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from lxml import etree
+import xml.etree.ElementTree as etree
 
 from ade_dedrm.adobe_fulfill import FulfillmentError
 from ade_dedrm.adobe_http import download_to_file
@@ -30,7 +30,7 @@ def _dc(tag: str) -> str:
     return f"{{{DC_NS}}}{tag}"
 
 
-def _build_rights_xml(state: DeviceState, license_token_el: etree._Element) -> str:
+def _build_rights_xml(state: DeviceState, license_token_el: etree.Element) -> str:
     license_url_el = license_token_el.find(f"./{_adept('licenseURL')}")
     if license_url_el is None or not license_url_el.text:
         raise FulfillmentError("licenseToken is missing licenseURL")
@@ -53,9 +53,8 @@ def _build_rights_xml(state: DeviceState, license_token_el: etree._Element) -> s
             f"No cached license service certificate for {license_url}"
         )
 
-    token_body = etree.tostring(
-        license_token_el, encoding="utf-8", pretty_print=True
-    ).decode("utf-8")
+    etree.indent(license_token_el, space="  ")
+    token_body = etree.tostring(license_token_el, encoding="utf-8").decode("utf-8")
 
     return (
         '<?xml version="1.0"?>\n'

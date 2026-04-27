@@ -15,9 +15,10 @@ from pathlib import Path
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
+import xml.etree.ElementTree as etree
+
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.PublicKey import RSA
-from lxml import etree
 
 NSMAP = {
     "adept": "http://ns.adobe.com/adept",
@@ -43,37 +44,42 @@ class _Decryptor:
         self._encrypted_no_decomp: set[bytes] = set()
         self._has_remaining_xml = False
 
-        to_remove = set()
-        expr = f"./{enc('EncryptedData')}/{enc('CipherData')}/{enc('CipherReference')}"
-        for elem in self._encryption.findall(expr):
-            path = elem.get("URI")
+        # Walk top-down from <enc:EncryptedData> children of <encryption>
+        # so we don't need parent pointers (stdlib ElementTree has none).
+        to_remove: list[etree.Element] = []
+        for enc_data in self._encryption.findall(f"./{enc('EncryptedData')}"):
+            cipher_ref = enc_data.find(
+                f"./{enc('CipherData')}/{enc('CipherReference')}"
+            )
+            if cipher_ref is None:
+                continue
+            path = cipher_ref.get("URI")
             if path is None:
                 continue
-            algo = (
-                elem.getparent()
-                .getparent()
-                .find(f"./{enc('EncryptionMethod')}")
-                .get("Algorithm")
-            )
+            method = enc_data.find(f"./{enc('EncryptionMethod')}")
+            if method is None:
+                continue
+            algo = method.get("Algorithm")
             path_b = path.encode("utf-8")
             if algo == "http://www.w3.org/2001/04/xmlenc#aes128-cbc":
                 self._encrypted.add(path_b)
-                to_remove.add(elem.getparent().getparent())
+                to_remove.append(enc_data)
             elif algo == "http://ns.adobe.com/adept/xmlenc#aes128-cbc-uncompressed":
                 self._encrypted_no_decomp.add(path_b)
-                to_remove.add(elem.getparent().getparent())
+                to_remove.append(enc_data)
             else:
                 self._has_remaining_xml = True
 
-        for elem in to_remove:
-            elem.getparent().remove(elem)
+        for enc_data in to_remove:
+            self._encryption.remove(enc_data)
 
     def has_remaining(self) -> bool:
         return self._has_remaining_xml
 
     def get_xml(self) -> bytes:
+        etree.indent(self._encryption, space="  ")
         return b'<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(
-            self._encryption, encoding="utf-8", pretty_print=True, xml_declaration=False
+            self._encryption, encoding="utf-8"
         )
 
     @staticmethod
@@ -98,7 +104,7 @@ class _Decryptor:
         return data
 
 
-def _remove_hardening(rights: etree._Element, keytype: str, keydata: bytes) -> bytes:
+def _remove_hardening(rights: etree.Element, keytype: str, keydata: bytes) -> bytes:
     adept = lambda tag: "{%s}%s" % (NSMAP["adept"], tag)
     get = lambda name: "".join(rights.findtext(f".//{adept(name)}"))
 
@@ -122,7 +128,7 @@ def is_adept_epub(inpath: Path) -> bool:
             if "META-INF/rights.xml" not in names or "META-INF/encryption.xml" not in names:
                 return False
             rights = etree.fromstring(zf.read("META-INF/rights.xml"))
-    except (zipfile.BadZipFile, etree.XMLSyntaxError):
+    except (zipfile.BadZipFile, etree.ParseError):
         return False
     adept = lambda tag: "{%s}%s" % (NSMAP["adept"], tag)
     bookkey = rights.findtext(f".//{adept('encryptedKey')}") or ""
