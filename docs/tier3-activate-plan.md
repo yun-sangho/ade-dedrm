@@ -1,4 +1,4 @@
-# Tier 3 구현 계획: 독립 ADE 활성화 (`ade-dedrm activate`)
+# Tier 3 구현 계획: 독립 ADE 활성화 (`dedrm activate`)
 
 > **Handoff 문서**: 이 계획은 별도 세션에서 작업 시작용으로 작성됐다.
 > 실행 전에 아래 "작업 재개 체크리스트"부터 확인할 것.
@@ -19,11 +19,11 @@
 
 ## Context
 
-`ade-dedrm`은 현재 fulfill/decrypt 코어는 완전히 크로스플랫폼이지만, **초기 상태 파일**(`devicesalt`, `device.xml`, `activation.xml`)을 얻는 방법이 macOS ADE 설치에 의존한다 (`src/ade_dedrm/adobe_import.py`). 그래서 다른 OS 사용자는 도구를 쓸 수가 없다.
+`dedrm`은 현재 fulfill/decrypt 코어는 완전히 크로스플랫폼이지만, **초기 상태 파일**(`devicesalt`, `device.xml`, `activation.xml`)을 얻는 방법이 macOS ADE 설치에 의존한다 (`src/dedrm/adobe_import.py`). 그래서 다른 OS 사용자는 도구를 쓸 수가 없다.
 
 이 단계의 목표는 ADE 설치 없이 Adobe 서버에 직접 디바이스를 등록해 상태 파일을 생성하는 `activate` 서브커맨드를 추가하는 것이다. 완성되면:
 
-- **Linux/Windows/macOS 어디서든** `uv tool install ade-dedrm` 후 `ade-dedrm activate --anonymous`만으로 쓸 수 있다
+- **Linux/Windows/macOS 어디서든** `uv tool install dedrm` 후 `dedrm activate --anonymous`만으로 쓸 수 있다
 - ADE 기존 사용자는 여전히 `init`로 기존 활성화를 재사용할 수 있다 (두 경로 공존)
 - 이후 Tier 2(Windows 네이티브 import), Tier 1(export/import state) 확장 시 이 모듈이 공통 기반이 된다
 
@@ -45,16 +45,16 @@
 
 | 경로 | 추정 LOC | 역할 |
 |---|---|---|
-| `src/ade_dedrm/adobe_versions.py` | ~60 | `AdeVersion` dataclass + 버전 테이블 + `ADE_2_0_1`, `ADE_3_0_1`, `ADE_4_0_3` 상수. `adobe_fulfill.py`와 공유 가능하게 분리 |
-| `src/ade_dedrm/adobe_activate.py` | ~380 | 활성화 파이프라인 (Phase A/B/C/D), 공개 API `activate_anonymous` / `activate_adobe_id` |
+| `src/dedrm/adobe_versions.py` | ~60 | `AdeVersion` dataclass + 버전 테이블 + `ADE_2_0_1`, `ADE_3_0_1`, `ADE_4_0_3` 상수. `adobe_fulfill.py`와 공유 가능하게 분리 |
+| `src/dedrm/adobe_activate.py` | ~380 | 활성화 파이프라인 (Phase A/B/C/D), 공개 API `activate_anonymous` / `activate_adobe_id` |
 | `tests/test_adobe_activate.py` | ~260 | Offline 유닛 테스트 12개 + 픽스처 |
 
 ### 수정할 파일
 
 | 경로 | 변경 내용 |
 |---|---|
-| `src/ade_dedrm/adobe_state.py` | `encrypt_with_devicesalt()` 추가 (기존 `decrypt_with_device_key()`의 짝), `load_pkcs12_from_bytes(pkcs12, devicesalt)` 내부 헬퍼 추가 — 디스크에 쓰기 전 pkcs12 언랩 가능하게 |
-| `src/ade_dedrm/cli.py` | `activate` 서브커맨드 + `_cmd_activate` 핸들러 추가, `EXIT_ACTIVATE_FAIL = 5` 추가 |
+| `src/dedrm/adobe_state.py` | `encrypt_with_devicesalt()` 추가 (기존 `decrypt_with_device_key()`의 짝), `load_pkcs12_from_bytes(pkcs12, devicesalt)` 내부 헬퍼 추가 — 디스크에 쓰기 전 pkcs12 언랩 가능하게 |
+| `src/dedrm/cli.py` | `activate` 서브커맨드 + `_cmd_activate` 핸들러 추가, `EXIT_ACTIVATE_FAIL = 5` 추가 |
 | `README.md` | `activate` 사용법 섹션, 수동 스모크 테스트 절차, 익명 활성화의 device slot 소비 고지 |
 
 ### 건드리지 않을 파일
@@ -67,7 +67,7 @@
 
 ## Public API
 
-`src/ade_dedrm/adobe_activate.py`에서 두 개만 export:
+`src/dedrm/adobe_activate.py`에서 두 개만 export:
 
 ```python
 class ActivationError(Exception): ...
@@ -98,8 +98,8 @@ def activate_adobe_id(
 ## CLI Interface
 
 ```
-ade-dedrm activate --anonymous [--ade-version VER] [--force]
-ade-dedrm activate --adobe-id EMAIL [--ade-version VER] [--force]
+dedrm activate --anonymous [--ade-version VER] [--force]
+dedrm activate --adobe-id EMAIL [--ade-version VER] [--force]
 ```
 
 - `--anonymous` 와 `--adobe-id EMAIL` 는 mutually exclusive, 하나 필수 (`required=True` mutex group)
@@ -382,15 +382,15 @@ act.add_argument("--ade-version", choices=["2.0.1", "3.0.1", "4.0.3"],
                  default="2.0.1",
                  help="Which ADE version to emulate (default: 2.0.1).")
 act.add_argument("-f", "--force", action="store_true",
-                 help="Overwrite existing ade-dedrm state.")
+                 help="Overwrite existing dedrm state.")
 
 
 def _cmd_activate(args) -> int:
-    from ade_dedrm.adobe_activate import (
+    from dedrm.adobe_activate import (
         ActivationError, activate_anonymous, activate_adobe_id,
     )
-    from ade_dedrm.adobe_versions import ADE_2_0_1, ADE_3_0_1, ADE_4_0_3
-    from ade_dedrm.adobe_state import DeviceState, state_dir
+    from dedrm.adobe_versions import ADE_2_0_1, ADE_3_0_1, ADE_4_0_3
+    from dedrm.adobe_state import DeviceState, state_dir
 
     version_map = {"2.0.1": ADE_2_0_1, "3.0.1": ADE_3_0_1, "4.0.3": ADE_4_0_3}
     version = version_map[args.ade_version]
@@ -442,12 +442,12 @@ README에 문서화:
 
 ```bash
 # 임시 state dir에서 익명 활성화
-export ADE_DEDRM_HOME=$(mktemp -d)
-uv run ade-dedrm activate --anonymous
-ls -la $ADE_DEDRM_HOME   # devicesalt, device.xml, activation.xml 세 파일
+export DEDRM_HOME=$(mktemp -d)
+uv run dedrm activate --anonymous
+ls -la $DEDRM_HOME   # devicesalt, device.xml, activation.xml 세 파일
 
 # 활성화 직후 실제 ACSM fulfill 확인
-uv run ade-dedrm process ~/Downloads/sample.acsm -k <key.der>
+uv run dedrm process ~/Downloads/sample.acsm -k <key.der>
 ```
 
 Adobe ID 경로는 별도로 수동 테스트 (CI 불가).
@@ -479,7 +479,7 @@ Python 3.12에서 `locale.getdefaultlocale()` deprecated. **하드코딩 `"en"` 
 ADE 4.0.3+ (build 123281+)는 HTTPS. 기본값 ADE 2.0.1은 HTTP. `adobe_http.py`의 lenient TLS (`CERT_NONE`) 설정이 양쪽 모두 처리. `_discover_services`, `_run_signin`, `_run_activate`가 같은 `version.use_https` 플래그를 일관되게 사용해야 함 — 안 그러면 activation.xml에 저장된 URL과 fulfill 시점 URL이 불일치.
 
 ### 6. `_add_nonce_xml` 공유
-현재 `adobe_fulfill.py`에 있음. 활성화에서도 필요 (activate request에 nonce 포함). 이번 단계에서는 **`from ade_dedrm.adobe_fulfill import _add_nonce_xml`** 로 import만. 나중에 `adobe_xml.py` 등으로 분리하는 리팩터는 별도 커밋.
+현재 `adobe_fulfill.py`에 있음. 활성화에서도 필요 (activate request에 nonce 포함). 이번 단계에서는 **`from dedrm.adobe_fulfill import _add_nonce_xml`** 로 import만. 나중에 `adobe_xml.py` 등으로 분리하는 리팩터는 별도 커밋.
 
 ### 7. `save_activation`의 `etree._ElementTree` vs `_Element` 혼동
 기존 `save_activation(state, tree)`는 `_ElementTree`를 받음. 활성화 오케스트레이터는 `_Element`로 작업하는 게 더 자연스러움 (루트에 계속 append). `_atomic_write_state` 안에서 `etree.tostring(root)`로 직접 직렬화하고 `save_activation`을 거치지 않도록 구성.
@@ -490,10 +490,10 @@ ADE 4.0.3+ (build 123281+)는 HTTPS. 기본값 ADE 2.0.1은 HTTP. `adobe_http.py
 
 | 파일 | 작업 | LOC |
 |---|---|---|
-| `src/ade_dedrm/adobe_versions.py` | 신규 | ~60 |
-| `src/ade_dedrm/adobe_activate.py` | 신규 | ~380 |
-| `src/ade_dedrm/adobe_state.py` | `encrypt_with_devicesalt` + `load_pkcs12_from_bytes` 추가 | +25 |
-| `src/ade_dedrm/cli.py` | `activate` 서브커맨드 + `_cmd_activate` + `EXIT_ACTIVATE_FAIL` | +60 |
+| `src/dedrm/adobe_versions.py` | 신규 | ~60 |
+| `src/dedrm/adobe_activate.py` | 신규 | ~380 |
+| `src/dedrm/adobe_state.py` | `encrypt_with_devicesalt` + `load_pkcs12_from_bytes` 추가 | +25 |
+| `src/dedrm/cli.py` | `activate` 서브커맨드 + `_cmd_activate` + `EXIT_ACTIVATE_FAIL` | +60 |
 | `tests/test_adobe_activate.py` | 신규 | ~260 |
 | `tests/test_adobe_state.py` | `encrypt_with_devicesalt` round-trip 테스트 추가 | +20 |
 | `README.md` | `activate` 섹션, 스모크 테스트, orphan device 고지 | +30 |
@@ -503,11 +503,11 @@ ADE 4.0.3+ (build 123281+)는 HTTPS. 기본값 ADE 2.0.1은 HTTP. `adobe_http.py
 
 ## 재사용 포인트
 
-- `src/ade_dedrm/adobe_sign.py:sign_node` — `/Activate` 요청 서명
-- `src/ade_dedrm/adobe_state.py:DeviceState` — 상태 디렉터리 관리
-- `src/ade_dedrm/adobe_state.py:decrypt_with_device_key` — 활성화 response의 pkcs12 언랩에서 사용
-- `src/ade_dedrm/adobe_http.py:post_adept, get_adept` — HTTP 레이어
-- `src/ade_dedrm/adobe_fulfill.py:_add_nonce_xml` — activate request의 nonce (이번엔 import만)
+- `src/dedrm/adobe_sign.py:sign_node` — `/Activate` 요청 서명
+- `src/dedrm/adobe_state.py:DeviceState` — 상태 디렉터리 관리
+- `src/dedrm/adobe_state.py:decrypt_with_device_key` — 활성화 response의 pkcs12 언랩에서 사용
+- `src/dedrm/adobe_http.py:post_adept, get_adept` — HTTP 레이어
+- `src/dedrm/adobe_fulfill.py:_add_nonce_xml` — activate request의 nonce (이번엔 import만)
 
 ---
 
@@ -541,29 +541,29 @@ ADE 4.0.3+ (build 123281+)는 HTTPS. 기본값 ADE 2.0.1은 HTTP. `adobe_http.py
 1. `uv run pytest tests/test_adobe_state.py -q` — 기존 통과 + 새 `encrypt_with_devicesalt` round-trip
 2. `uv run pytest tests/test_adobe_activate.py -q` — 신규 12개 유닛 테스트 전부 통과
 3. `uv run pytest tests/ -q` — 전체 38개 테스트 통과 (기존 26 + 신규 12)
-4. `uv run ade-dedrm activate --help` — argparse 구조 정상
-5. `uv run ade-dedrm activate --anonymous --ade-version 2.0.1` 와 `--adobe-id` 의 mutex 강제 여부 (둘 다 주면 SystemExit)
+4. `uv run dedrm activate --help` — argparse 구조 정상
+5. `uv run dedrm activate --anonymous --ade-version 2.0.1` 와 `--adobe-id` 의 mutex 강제 여부 (둘 다 주면 SystemExit)
 
 ### End-to-end 수동 스모크 (서버 필요)
 
 ```bash
 # clean slate
-export ADE_DEDRM_HOME=$(mktemp -d)
+export DEDRM_HOME=$(mktemp -d)
 
 # anonymous activation
-uv run ade-dedrm activate --anonymous
-ls -la $ADE_DEDRM_HOME
+uv run dedrm activate --anonymous
+ls -la $DEDRM_HOME
 #   devicesalt       (16 B)
 #   device.xml       (~500 B)
 #   activation.xml   (~10 KB, credentials + activationToken 포함)
 
 # 방금 활성화된 상태로 fulfill이 돌아가는지 — 이것이 진짜 검증
-uv run ade-dedrm fulfill ~/Downloads/sample.acsm -o /tmp/test.drm.epub
+uv run dedrm fulfill ~/Downloads/sample.acsm -o /tmp/test.drm.epub
 #   성공하면 activate 경로가 완벽하게 동작
 
 # Adobe ID 경로 (별도 계정으로 한 번만)
-export ADE_DEDRM_HOME=$(mktemp -d)
-uv run ade-dedrm activate --adobe-id test@example.com
+export DEDRM_HOME=$(mktemp -d)
+uv run dedrm activate --adobe-id test@example.com
 #   getpass 프롬프트에 비밀번호 입력
 #   성공 시 activation.xml에 <adept:username method="AdobeID">가 들어있어야 함
 ```

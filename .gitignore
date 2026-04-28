@@ -13,3 +13,8 @@ wheels/
 .env
 .env.*
 !.env.example
+
+# Claude Code — per-user local settings and runtime artifacts
+.claude/settings.local.json
+.claude/hooks-logs/
+.worktree-setup.log

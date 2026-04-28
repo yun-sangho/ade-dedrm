@@ -1588,7 +1588,7 @@ class PDFSerializer:
 def decrypt_pdf(userkey: bytes, inpath: Path, outpath: Path) -> int:
     """Decrypt an Adobe ADEPT-protected PDF.
 
-    Return codes match :func:`ade_dedrm.epub.decrypt_book`:
+    Return codes match :func:`dedrm.epub.decrypt_book`:
         0 — success
         1 — not DRM-protected
         2 — wrong key / decryption failure

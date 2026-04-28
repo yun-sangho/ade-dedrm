@@ -17,9 +17,9 @@ from datetime import datetime, timedelta
 
 import xml.etree.ElementTree as etree
 
-from ade_dedrm.adobe_http import AdeptHTTPError, get_adept, post_adept
-from ade_dedrm.adobe_sign import ADEPT_NS, sign_node
-from ade_dedrm.adobe_state import (
+from dedrm.adobe_http import AdeptHTTPError, get_adept, post_adept
+from dedrm.adobe_sign import ADEPT_NS, sign_node
+from dedrm.adobe_state import (
     DeviceState,
     load_pkcs12_cert_der,
     load_pkcs12_private_key_der,

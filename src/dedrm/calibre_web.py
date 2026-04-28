@@ -26,7 +26,7 @@ from http.cookiejar import CookieJar
 from html.parser import HTMLParser
 from pathlib import Path
 
-USER_AGENT = "ade-dedrm"
+USER_AGENT = "dedrm"
 
 
 class CalibreWebError(Exception):

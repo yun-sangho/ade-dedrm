@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from ade_dedrm.adobe_pdf_patch import (
+from dedrm.adobe_pdf_patch import (
     PDFPatchError,
     _BackwardReader,
     _cleanup_encrypt_element,

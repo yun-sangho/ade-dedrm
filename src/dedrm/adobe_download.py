@@ -13,11 +13,11 @@ from pathlib import Path
 
 import xml.etree.ElementTree as etree
 
-from ade_dedrm.adobe_fulfill import FulfillmentError
-from ade_dedrm.adobe_http import download_to_file
-from ade_dedrm.adobe_pdf_patch import patch_drm_into_pdf
-from ade_dedrm.adobe_sign import ADEPT_NS
-from ade_dedrm.adobe_state import DeviceState
+from dedrm.adobe_fulfill import FulfillmentError
+from dedrm.adobe_http import download_to_file
+from dedrm.adobe_pdf_patch import patch_drm_into_pdf
+from dedrm.adobe_sign import ADEPT_NS
+from dedrm.adobe_state import DeviceState
 
 DC_NS = "http://purl.org/dc/elements/1.1/"
 

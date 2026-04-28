@@ -1,4 +1,4 @@
-ade-dedrm
+dedrm
 Copyright (C) 2026 yun-sangho
 
 This program is free software: you can redistribute it and/or modify it under
@@ -9,7 +9,7 @@ Foundation, version 3 of the License.
 THIRD-PARTY ATTRIBUTIONS
 =============================================================================
 
-Portions of this software (src/ade_dedrm/epub.py and src/ade_dedrm/keyfetch.py)
+Portions of this software (src/dedrm/epub.py and src/dedrm/keyfetch.py)
 are derived from DeDRM_tools:
 
     https://github.com/noDRM/DeDRM_tools

@@ -6,7 +6,7 @@ from io import BytesIO
 
 import pytest
 
-from ade_dedrm.pdf import (
+from dedrm.pdf import (
     KWD,
     LIT,
     PDFParser,

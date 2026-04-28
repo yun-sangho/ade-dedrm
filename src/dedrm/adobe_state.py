@@ -6,7 +6,7 @@ Stores the three files that together represent a registered ADE device:
     activation.xml   — credentials (pkcs12), user/device UUIDs, certs,
                        privateLicenseKey, operator/license caches
 
-All live under ~/.config/ade-dedrm/ (or $ADE_DEDRM_HOME if set). This
+All live under ~/.config/dedrm/ (or $DEDRM_HOME if set). This
 matches the *shape* of DeACSM's state but with our own location.
 """
 
@@ -31,12 +31,12 @@ def _adept(tag: str) -> str:
 
 
 def state_dir() -> Path:
-    override = os.environ.get("ADE_DEDRM_HOME")
+    override = os.environ.get("DEDRM_HOME")
     if override:
         return Path(override).expanduser()
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg).expanduser() if xdg else Path.home() / ".config"
-    return base / "ade-dedrm"
+    return base / "dedrm"
 
 
 @dataclass
