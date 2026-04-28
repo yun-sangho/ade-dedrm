@@ -603,8 +603,33 @@ def _cmd_config_setup() -> int:
 
 
 def _cmd_config_show() -> int:
+    from ade_dedrm.adobe_state import DeviceState, state_dir
     from ade_dedrm.config import describe_sources, persistent_env_path
 
+    # ADE activation state — populated by `ade-dedrm init`. Shown first
+    # because `decrypt` depends on it; Calibre Web settings below are
+    # only relevant for `upload` / `decrypt --upload`.
+    sd = state_dir()
+    state = DeviceState(root=sd)
+    state_files = (
+        ("devicesalt", state.devicesalt),
+        ("device.xml", state.device_xml),
+        ("activation.xml", state.activation_xml),
+        ("adobekey.der", sd / "adobekey.der"),
+    )
+    print(f"# state directory: {sd}")
+    if not any(p.is_file() for _, p in state_files):
+        print("  (not initialised — run `ade-dedrm init`)")
+    else:
+        for name, path in state_files:
+            mark = "present" if path.is_file() else "missing"
+            print(f"  {name}: {mark}")
+        if state.exists():
+            print("  status: ready (decrypt can run)")
+        else:
+            print("  status: incomplete (re-run `ade-dedrm init --force`)")
+
+    print()
     sources = describe_sources()
 
     env_file = sources.get("env_file_path")
