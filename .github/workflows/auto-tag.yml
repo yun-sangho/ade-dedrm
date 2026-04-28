@@ -1,0 +1,64 @@
+name: Auto-tag on version bump
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write   # push the new tag
+  actions: write    # trigger Bump Homebrew formula via workflow_dispatch
+
+concurrency:
+  group: auto-tag-main
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need history + existing tags
+
+      - name: Read version from pyproject.toml
+        id: ver
+        run: |
+          VERSION=$(python3 -c "import tomllib,sys; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version in pyproject.toml: $VERSION"
+
+      - name: Check whether tag already exists
+        id: check
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists — nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag $TAG does not exist — will create."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push tag
+        if: steps.check.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+
+      # Tag pushes from GITHUB_TOKEN do not trigger downstream workflows, so
+      # we explicitly dispatch Bump Homebrew formula here. workflow_dispatch
+      # invocations from GITHUB_TOKEN do create new workflow runs.
+      - name: Trigger Homebrew formula bump
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.check.outputs.tag }}
+        run: gh workflow run bump-formula.yml -f tag="$TAG"
