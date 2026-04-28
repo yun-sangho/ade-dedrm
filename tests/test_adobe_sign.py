@@ -9,7 +9,7 @@ import xml.etree.ElementTree as etree
 
 from Crypto.PublicKey import RSA
 
-from ade_dedrm.adobe_sign import (
+from dedrm.adobe_sign import (
     ADEPT_NS,
     _pkcs1v15_ff_pad,
     hash_node,

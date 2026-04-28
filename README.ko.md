@@ -1,4 +1,4 @@
-# ade-dedrm
+# dedrm
 
 > Adobe Digital Editions(ADE)의 Adept DRM이 걸린 EPUB·PDF를 CLI 한 줄로 처리하는 도구.
 > `.acsm` fulfillment 티켓부터 DRM-free 파일까지 전 단계가 하나의 파이프라인에 들어있다.
@@ -15,10 +15,10 @@
 
 | 작업 | 서브커맨드 | 결과 |
 |---|---|---|
-| 로컬 macOS ADE 활성화 + 사용자 키 가져오기 | `init` | `~/.config/ade-dedrm/` 에 상태 파일 + `adobekey.der` |
+| 로컬 macOS ADE 활성화 + 사용자 키 가져오기 | `init` | `~/.config/dedrm/` 에 상태 파일 + `adobekey.der` |
 | ACSM fulfillment + Adept DRM 해제 (ACSM/EPUB/PDF 자동 판별) | `decrypt` | DRM-free EPUB/PDF |
 | 변환된 EPUB/PDF 를 [Calibre Web](https://github.com/janeczku/calibre-web) 에 업로드 | `upload` | Calibre Web 서재에 새 책 |
-| Calibre Web 접속 정보 저장 | `config setup` / `config set-calibre` / `config show` | `~/.config/ade-dedrm/.env` (권한 0600) |
+| Calibre Web 접속 정보 저장 | `config setup` / `config set-calibre` / `config show` | `~/.config/dedrm/.env` (권한 0600) |
 
 ## Homebrew 로 설치 (macOS)
 
@@ -26,10 +26,6 @@
 brew install yun-sangho/tap/dedrm
 dedrm --help
 ```
-
-Formula 가 Homebrew prefix 아래에 격리된 Python 3.12 가상환경을 만들고
-`dedrm` / `ade-dedrm` 두 명령을 PATH 에 노출한다. 첫 설치 시
-`cryptography` 의 Rust 확장이 컴파일되며 1–2 분 정도 걸린다.
 
 ## 빠른 시작 (macOS)
 
@@ -50,7 +46,7 @@ dedrm decrypt ~/Downloads/book.acsm
 
 `~/Library/Application Support/Adobe/Digital Editions/activation.dat`와
 macOS 키체인의 `DeviceKey` / `DeviceFingerprint`를 조합해
-`~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
+`~/.config/dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
 를 한 번에 만든다.
 
 ```bash
@@ -59,12 +55,12 @@ dedrm init [--force] [-o PATH]
 
 - **선행 조건**: macOS에 ADE가 설치돼 있고 Help → Authorize Computer 로 본인 계정 인증 완료
 - 키체인 조회 시 macOS가 권한 프롬프트를 띄울 수 있음
-- `--force`: 기존 `~/.config/ade-dedrm/` 및 `-o` 대상 파일을 덮어씀
+- `--force`: 기존 `~/.config/dedrm/` 및 `-o` 대상 파일을 덮어씀
 - `-o / --key-output PATH`: `adobekey.der` 의 추가 사본을 해당 경로에
   복사한다. 원본은 항상 상태 디렉터리 안에 들어가므로 `decrypt` 는
   `-k` 없이도 키를 찾을 수 있다.
-- **상태 디렉터리 위치**: `$ADE_DEDRM_HOME` 환경변수로 오버라이드 가능
-  (기본값: `$XDG_CONFIG_HOME/ade-dedrm` 또는 `~/.config/ade-dedrm`)
+- **상태 디렉터리 위치**: `$DEDRM_HOME` 환경변수로 오버라이드 가능
+  (기본값: `$XDG_CONFIG_HOME/dedrm` 또는 `~/.config/dedrm`)
 
 ### `decrypt` — `.acsm` 또는 Adept DRM EPUB/PDF → DRM-free 파일
 
@@ -128,7 +124,7 @@ dedrm config set-calibre --url ... --username ...   # 스크립트용
 dedrm config show                          # 현재 소스 전체 확인
 ```
 
-세 커맨드 모두 **단일 파일** 하나만 읽고 쓴다 — `~/.config/ade-dedrm/.env`
+세 커맨드 모두 **단일 파일** 하나만 읽고 쓴다 — `~/.config/dedrm/.env`
 (권한 `0o600`). 별도의 JSON 설정 파일은 없다.
 
 - `config setup` 은 URL · username · password 를 하나씩 묻는다.
@@ -148,14 +144,14 @@ dedrm config show                          # 현재 소스 전체 확인
 1. CLI 플래그 (`--calibre-url`, `--calibre-username`, `--calibre-password`,
    `--calibre-verify-tls` / `--calibre-no-verify-tls`)
 2. 프로세스 환경변수:
-   - `ADE_DEDRM_CALIBRE_URL`
-   - `ADE_DEDRM_CALIBRE_USERNAME`
-   - `ADE_DEDRM_CALIBRE_PASSWORD`
-   - `ADE_DEDRM_CALIBRE_VERIFY_TLS` (`false`/`0`/`no`/`off` → 검증 끔)
+   - `DEDRM_CALIBRE_URL`
+   - `DEDRM_CALIBRE_USERNAME`
+   - `DEDRM_CALIBRE_PASSWORD`
+   - `DEDRM_CALIBRE_VERIFY_TLS` (`false`/`0`/`no`/`off` → 검증 끔)
 3. `.env` 파일. 아래 중 **처음으로 존재하는 파일 하나만** 로드한다:
    - `--env-file PATH` 로 명시된 파일
    - 현재 디렉터리의 `./.env`
-   - `~/.config/ade-dedrm/.env` (영구 저장 위치, `config` 커맨드가 쓰는 곳)
+   - `~/.config/dedrm/.env` (영구 저장 위치, `config` 커맨드가 쓰는 곳)
 
 위 단계를 모두 돌고도 미결인 필드가 있으면 어떤 필드가 비어있는지 명시한
 에러로 종료된다. 변수명 예시는 [`.env.example`](./.env.example) 을 참고.
@@ -200,7 +196,7 @@ dedrm decrypt 암호화된책.pdf
 테스트용 임시 환경 등:
 
 ```bash
-export ADE_DEDRM_HOME=$(mktemp -d)
+export DEDRM_HOME=$(mktemp -d)
 dedrm init
 dedrm decrypt book.acsm
 ```
@@ -212,24 +208,6 @@ dedrm config show
 # → 로더가 보고 있는 .env 파일, 프로세스 환경변수, 그리고 최종 해석된
 #   effective 설정을 한꺼번에 출력 (password 는 *** 로 마스킹).
 ```
-
-## 크로스플랫폼 현황
-
-현재 코드 약 95%는 플랫폼 독립적이고, Linux/Windows에서도 동작한다. 단,
-**초기 상태 파일을 얻는 방법**만 macOS에 한정돼 있다:
-
-| 영역 | macOS | Linux | Windows |
-|---|---|---|---|
-| `decrypt` (DRM 해제 + ACSM fulfillment) | ✅ | ✅ | ✅ |
-| 상태 bootstrap (`init`) | ✅ | ❌ | ❌ |
-| 상태 bootstrap (`activate`) | 🗓 예정 | 🗓 예정 | 🗓 예정 |
-
-즉 macOS 사용자가 한 번 `init` 로 만든 `~/.config/ade-dedrm/` 를
-다른 OS 기기에 복사하면 거기서도 `decrypt` 가 그대로 동작한다.
-
-**완전한 크로스플랫폼 지원 계획**: Tier 3 (`ade-dedrm activate --anonymous` /
-`--adobe-id`) 로 ADE 설치 없이 Adobe 서버에 직접 디바이스를 등록하는 경로를
-추가한다. 상세 계획: [`docs/tier3-activate-plan.md`](./docs/tier3-activate-plan.md)
 
 ## 종료 코드
 
@@ -271,8 +249,8 @@ Google 서버의 거부다. `play.google.com/books` → 설정 → 기기 관리
 만든다. **일반 사용자는 uv 가 필요 없고, 기여자만 쓰면 된다.**
 
 ```bash
-git clone https://github.com/yun-sangho/ade-dedrm.git
-cd ade-dedrm
+git clone https://github.com/yun-sangho/dedrm.git
+cd dedrm
 uv sync
 ```
 

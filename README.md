@@ -1,4 +1,4 @@
-# ade-dedrm
+# dedrm
 
 > A single-command CLI that turns Adobe Digital Editions (ADE) `.acsm`
 > fulfillment tickets and Adept-DRM-protected EPUB / PDF files into
@@ -17,10 +17,10 @@
 
 | Task | Subcommand | Output |
 |---|---|---|
-| Bootstrap state + user key from a local ADE install (macOS) | `init` | state files + `adobekey.der` under `~/.config/ade-dedrm/` |
+| Bootstrap state + user key from a local ADE install (macOS) | `init` | state files + `adobekey.der` under `~/.config/dedrm/` |
 | ACSM fulfillment and/or Adept DRM removal (EPUB/PDF/ACSM auto-detected) | `decrypt` | DRM-free EPUB or PDF |
 | Upload a decrypted EPUB/PDF to a [Calibre Web](https://github.com/janeczku/calibre-web) library | `upload` | new book in your Calibre Web instance |
-| Persist Calibre Web connection details | `config setup` / `config set-calibre` / `config show` | `~/.config/ade-dedrm/.env` (mode 0600) |
+| Persist Calibre Web connection details | `config setup` / `config set-calibre` / `config show` | `~/.config/dedrm/.env` (mode 0600) |
 
 ## Install via Homebrew (macOS)
 
@@ -28,11 +28,6 @@
 brew install yun-sangho/tap/dedrm
 dedrm --help
 ```
-
-The formula installs an isolated Python 3.12 virtualenv under Homebrew's
-prefix and exposes both the `dedrm` and `ade-dedrm` commands on `PATH`.
-First-time install compiles the `cryptography` Rust extension, which
-takes 1–2 minutes.
 
 ## Quick start (macOS)
 
@@ -54,7 +49,7 @@ dedrm decrypt ~/Downloads/book.acsm
 
 Combines `~/Library/Application Support/Adobe/Digital Editions/activation.dat`
 with the `DeviceKey` / `DeviceFingerprint` entries stored in the macOS
-keychain, producing `~/.config/ade-dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
+keychain, producing `~/.config/dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
 in one shot.
 
 ```bash
@@ -64,13 +59,13 @@ dedrm init [--force] [-o PATH]
 - **Precondition**: ADE is installed and you have already completed
   Help → Authorize Computer with your Adobe ID.
 - macOS may prompt for keychain access when reading the device secrets.
-- `--force`: overwrite an existing `~/.config/ade-dedrm/` directory (and
+- `--force`: overwrite an existing `~/.config/dedrm/` directory (and
   any `-o` target).
 - `-o / --key-output PATH`: also write an extra copy of `adobekey.der`
   to the given path. The canonical copy always lives under the state
   directory, so `decrypt` can find it without `-k`.
-- **State directory location** can be overridden with `$ADE_DEDRM_HOME`
-  (default: `$XDG_CONFIG_HOME/ade-dedrm`, falling back to `~/.config/ade-dedrm`).
+- **State directory location** can be overridden with `$DEDRM_HOME`
+  (default: `$XDG_CONFIG_HOME/dedrm`, falling back to `~/.config/dedrm`).
 
 ### `decrypt` — turn an `.acsm` or an Adept-protected EPUB/PDF into a clean file
 
@@ -137,7 +132,7 @@ dedrm config set-calibre --url ... --username ...   # scripted
 dedrm config show                          # inspect all sources
 ```
 
-All three commands operate on a single file — `~/.config/ade-dedrm/.env`
+All three commands operate on a single file — `~/.config/dedrm/.env`
 (mode `0o600`). There is **no** separate JSON config.
 
 - `config setup` prompts for URL, username, and password one by one.
@@ -159,14 +154,14 @@ field:
 1. CLI flags (`--calibre-url`, `--calibre-username`, `--calibre-password`,
    `--calibre-verify-tls` / `--calibre-no-verify-tls`)
 2. Process environment variables:
-   - `ADE_DEDRM_CALIBRE_URL`
-   - `ADE_DEDRM_CALIBRE_USERNAME`
-   - `ADE_DEDRM_CALIBRE_PASSWORD`
-   - `ADE_DEDRM_CALIBRE_VERIFY_TLS` (`false`/`0`/`no`/`off` → off)
+   - `DEDRM_CALIBRE_URL`
+   - `DEDRM_CALIBRE_USERNAME`
+   - `DEDRM_CALIBRE_PASSWORD`
+   - `DEDRM_CALIBRE_VERIFY_TLS` (`false`/`0`/`no`/`off` → off)
 3. A `.env` file. The first of these that exists is loaded:
    - `--env-file PATH` (explicit)
    - `./.env` in the current directory
-   - `~/.config/ade-dedrm/.env` (the "persistent" one written by `config`)
+   - `~/.config/dedrm/.env` (the "persistent" one written by `config`)
 
 Everything missing after that raises a clear error listing the
 unresolved fields. See [`.env.example`](./.env.example) for the
@@ -212,7 +207,7 @@ dedrm decrypt encrypted_book.pdf
 Useful for sandboxed tests or multiple activations:
 
 ```bash
-export ADE_DEDRM_HOME=$(mktemp -d)
+export DEDRM_HOME=$(mktemp -d)
 dedrm init
 dedrm decrypt book.acsm
 ```
@@ -224,28 +219,6 @@ dedrm config show
 # → shows the .env file in use, any process env vars, and the effective
 #   resolved settings (password masked).
 ```
-
-## Cross-platform status
-
-Roughly 95% of the source is pure Python and works on any platform
-`cryptography` + `pycryptodome` + `lxml` do. The only OS-specific piece
-is how the initial state files are obtained:
-
-| Area | macOS | Linux | Windows |
-|---|---|---|---|
-| `decrypt` (DRM removal + ACSM fulfillment) | ✅ | ✅ | ✅ |
-| State bootstrap (`init`) | ✅ | ❌ | ❌ |
-| State bootstrap (`activate`) | 🗓 planned | 🗓 planned | 🗓 planned |
-
-A macOS user can run `init` once and copy the resulting
-`~/.config/ade-dedrm/` directory to any Linux or Windows machine —
-`decrypt` will work without changes on either side.
-
-**Roadmap to true cross-platform**: Tier 3 adds an `ade-dedrm activate
---anonymous` / `--adobe-id` subcommand that registers a fresh ADE device
-directly against Adobe's ACS4 servers, removing the dependency on a
-local ADE install entirely. Detailed plan:
-[`docs/tier3-activate-plan.md`](./docs/tier3-activate-plan.md).
 
 ## Exit codes
 
@@ -297,8 +270,8 @@ Local checkout uses [uv](https://github.com/astral-sh/uv) for the dev
 virtualenv. End users do not need uv — only contributors do.
 
 ```bash
-git clone https://github.com/yun-sangho/ade-dedrm.git
-cd ade-dedrm
+git clone https://github.com/yun-sangho/dedrm.git
+cd dedrm
 uv sync
 ```
 

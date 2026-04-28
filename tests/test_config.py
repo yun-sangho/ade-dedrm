@@ -1,4 +1,4 @@
-"""Tests for ade_dedrm.config: precedence, .env parsing, persistent save."""
+"""Tests for dedrm.config: precedence, .env parsing, persistent save."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from ade_dedrm import config
-from ade_dedrm.config import (
+from dedrm import config
+from dedrm.config import (
     CalibreWebSettings,
     ConfigError,
     describe_sources,
@@ -24,7 +24,7 @@ from ade_dedrm.config import (
 def _isolated_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("ADE_DEDRM_HOME", str(home))
+    monkeypatch.setenv("DEDRM_HOME", str(home))
     for key in (
         config.ENV_CALIBRE_URL,
         config.ENV_CALIBRE_USERNAME,
@@ -41,26 +41,26 @@ def test_parse_env_file_handles_quotes_comments_export(tmp_path: Path) -> None:
     env.write_text(
         """
 # a comment
-ADE_DEDRM_CALIBRE_URL="http://example.com"
-export ADE_DEDRM_CALIBRE_USERNAME='alice'
-ADE_DEDRM_CALIBRE_PASSWORD=hunter2
+DEDRM_CALIBRE_URL="http://example.com"
+export DEDRM_CALIBRE_USERNAME='alice'
+DEDRM_CALIBRE_PASSWORD=hunter2
 BLANK=
 """,
         encoding="utf-8",
     )
     parsed = parse_env_file(env)
-    assert parsed["ADE_DEDRM_CALIBRE_URL"] == "http://example.com"
-    assert parsed["ADE_DEDRM_CALIBRE_USERNAME"] == "alice"
-    assert parsed["ADE_DEDRM_CALIBRE_PASSWORD"] == "hunter2"
+    assert parsed["DEDRM_CALIBRE_URL"] == "http://example.com"
+    assert parsed["DEDRM_CALIBRE_USERNAME"] == "alice"
+    assert parsed["DEDRM_CALIBRE_PASSWORD"] == "hunter2"
     assert parsed["BLANK"] == ""
 
 
 def test_persistent_env_loaded_when_no_cwd_env(_isolated_state: Path) -> None:
     persistent = persistent_env_path()
     persistent.write_text(
-        "ADE_DEDRM_CALIBRE_URL=http://cw.local\n"
-        "ADE_DEDRM_CALIBRE_USERNAME=alice\n"
-        "ADE_DEDRM_CALIBRE_PASSWORD=hunter2\n",
+        "DEDRM_CALIBRE_URL=http://cw.local\n"
+        "DEDRM_CALIBRE_USERNAME=alice\n"
+        "DEDRM_CALIBRE_PASSWORD=hunter2\n",
         encoding="utf-8",
     )
     settings = load_calibre_settings()
@@ -75,15 +75,15 @@ def test_persistent_env_loaded_when_no_cwd_env(_isolated_state: Path) -> None:
 def test_cwd_env_preferred_over_state_env(_isolated_state: Path) -> None:
     persistent = persistent_env_path()
     persistent.write_text(
-        "ADE_DEDRM_CALIBRE_URL=http://state\n"
-        "ADE_DEDRM_CALIBRE_USERNAME=state-user\n"
-        "ADE_DEDRM_CALIBRE_PASSWORD=state-pw\n",
+        "DEDRM_CALIBRE_URL=http://state\n"
+        "DEDRM_CALIBRE_USERNAME=state-user\n"
+        "DEDRM_CALIBRE_PASSWORD=state-pw\n",
         encoding="utf-8",
     )
     (Path.cwd() / ".env").write_text(
-        "ADE_DEDRM_CALIBRE_URL=http://cwd\n"
-        "ADE_DEDRM_CALIBRE_USERNAME=cwd-user\n"
-        "ADE_DEDRM_CALIBRE_PASSWORD=cwd-pw\n",
+        "DEDRM_CALIBRE_URL=http://cwd\n"
+        "DEDRM_CALIBRE_USERNAME=cwd-user\n"
+        "DEDRM_CALIBRE_PASSWORD=cwd-pw\n",
         encoding="utf-8",
     )
     settings = load_calibre_settings()
@@ -96,12 +96,12 @@ def test_process_env_overrides_env_file(
     _isolated_state: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (Path.cwd() / ".env").write_text(
-        "ADE_DEDRM_CALIBRE_URL=http://cw.local\n"
-        "ADE_DEDRM_CALIBRE_USERNAME=alice\n"
-        "ADE_DEDRM_CALIBRE_PASSWORD=from-dotenv\n",
+        "DEDRM_CALIBRE_URL=http://cw.local\n"
+        "DEDRM_CALIBRE_USERNAME=alice\n"
+        "DEDRM_CALIBRE_PASSWORD=from-dotenv\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_PASSWORD", "from-env")
+    monkeypatch.setenv("DEDRM_CALIBRE_PASSWORD", "from-env")
     settings = load_calibre_settings()
     assert settings.password == "from-env"
 
@@ -110,12 +110,12 @@ def test_cli_overrides_everything(
     _isolated_state: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (Path.cwd() / ".env").write_text(
-        "ADE_DEDRM_CALIBRE_URL=http://cw.local\n"
-        "ADE_DEDRM_CALIBRE_USERNAME=alice\n"
-        "ADE_DEDRM_CALIBRE_PASSWORD=from-dotenv\n",
+        "DEDRM_CALIBRE_URL=http://cw.local\n"
+        "DEDRM_CALIBRE_USERNAME=alice\n"
+        "DEDRM_CALIBRE_PASSWORD=from-dotenv\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_PASSWORD", "from-env")
+    monkeypatch.setenv("DEDRM_CALIBRE_PASSWORD", "from-env")
     settings = load_calibre_settings(cli_overrides={"password": "from-cli"})
     assert settings.password == "from-cli"
 
@@ -130,12 +130,12 @@ def test_missing_required_fields_raise(_isolated_state: Path) -> None:
 def test_verify_tls_env_coercion(
     _isolated_state: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_URL", "http://cw.local")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_USERNAME", "alice")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_PASSWORD", "p")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_VERIFY_TLS", "false")
+    monkeypatch.setenv("DEDRM_CALIBRE_URL", "http://cw.local")
+    monkeypatch.setenv("DEDRM_CALIBRE_USERNAME", "alice")
+    monkeypatch.setenv("DEDRM_CALIBRE_PASSWORD", "p")
+    monkeypatch.setenv("DEDRM_CALIBRE_VERIFY_TLS", "false")
     assert load_calibre_settings().verify_tls is False
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_VERIFY_TLS", "1")
+    monkeypatch.setenv("DEDRM_CALIBRE_VERIFY_TLS", "1")
     assert load_calibre_settings().verify_tls is True
 
 
@@ -152,9 +152,9 @@ def test_save_calibre_settings_chmod_600(_isolated_state: Path) -> None:
     mode = stat.S_IMODE(os.stat(path).st_mode)
     assert mode == 0o600
     parsed = parse_env_file(path)
-    assert parsed["ADE_DEDRM_CALIBRE_URL"] == "http://cw.local"
-    assert parsed["ADE_DEDRM_CALIBRE_USERNAME"] == "alice"
-    assert parsed["ADE_DEDRM_CALIBRE_PASSWORD"] == "p"
+    assert parsed["DEDRM_CALIBRE_URL"] == "http://cw.local"
+    assert parsed["DEDRM_CALIBRE_USERNAME"] == "alice"
+    assert parsed["DEDRM_CALIBRE_PASSWORD"] == "p"
 
 
 def test_save_calibre_settings_merges_and_preserves(_isolated_state: Path) -> None:
@@ -163,16 +163,16 @@ def test_save_calibre_settings_merges_and_preserves(_isolated_state: Path) -> No
     path.write_text(
         "# my comment\n"
         "UNRELATED=keep-me\n"
-        "ADE_DEDRM_CALIBRE_URL=http://old\n",
+        "DEDRM_CALIBRE_URL=http://old\n",
         encoding="utf-8",
     )
     save_calibre_settings({"url": "http://new", "username": "alice"})
     text = path.read_text(encoding="utf-8")
     assert "# my comment" in text
     assert "UNRELATED=keep-me" in text
-    assert "ADE_DEDRM_CALIBRE_URL=http://new" in text
-    assert "ADE_DEDRM_CALIBRE_USERNAME=alice" in text
-    assert "ADE_DEDRM_CALIBRE_URL=http://old" not in text
+    assert "DEDRM_CALIBRE_URL=http://new" in text
+    assert "DEDRM_CALIBRE_USERNAME=alice" in text
+    assert "DEDRM_CALIBRE_URL=http://old" not in text
 
 
 def test_save_rejects_unknown_field(_isolated_state: Path) -> None:
@@ -200,7 +200,7 @@ def test_describe_sources_reports_missing(_isolated_state: Path) -> None:
 def test_strips_trailing_slash_from_url(
     _isolated_state: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_URL", "http://cw.local/")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_USERNAME", "alice")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_PASSWORD", "p")
+    monkeypatch.setenv("DEDRM_CALIBRE_URL", "http://cw.local/")
+    monkeypatch.setenv("DEDRM_CALIBRE_USERNAME", "alice")
+    monkeypatch.setenv("DEDRM_CALIBRE_PASSWORD", "p")
     assert load_calibre_settings().url == "http://cw.local"

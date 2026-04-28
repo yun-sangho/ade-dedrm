@@ -12,7 +12,7 @@ from typing import Iterator
 
 import pytest
 
-from ade_dedrm.calibre_web import CalibreWebClient, CalibreWebError
+from dedrm.calibre_web import CalibreWebClient, CalibreWebError
 
 
 LOGIN_HTML = (
@@ -208,13 +208,13 @@ def test_network_error_wrapped() -> None:
 def test_upload_cli_delete_after_upload(
     fake_server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from ade_dedrm import cli
+    from dedrm import cli
 
     url, _behavior = fake_server
     target = _sample_epub(tmp_path)
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_URL", url)
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_USERNAME", "alice")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_PASSWORD", "hunter2")
+    monkeypatch.setenv("DEDRM_CALIBRE_URL", url)
+    monkeypatch.setenv("DEDRM_CALIBRE_USERNAME", "alice")
+    monkeypatch.setenv("DEDRM_CALIBRE_PASSWORD", "hunter2")
     rc = cli.main(["upload", str(target), "--delete-after-upload"])
     assert rc == 0
     assert not target.exists()
@@ -223,14 +223,14 @@ def test_upload_cli_delete_after_upload(
 def test_upload_cli_keeps_file_on_failure(
     fake_server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from ade_dedrm import cli
+    from dedrm import cli
 
     url, behavior = fake_server
     behavior["forbidden"] = True
     target = _sample_epub(tmp_path)
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_URL", url)
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_USERNAME", "alice")
-    monkeypatch.setenv("ADE_DEDRM_CALIBRE_PASSWORD", "hunter2")
+    monkeypatch.setenv("DEDRM_CALIBRE_URL", url)
+    monkeypatch.setenv("DEDRM_CALIBRE_USERNAME", "alice")
+    monkeypatch.setenv("DEDRM_CALIBRE_PASSWORD", "hunter2")
     rc = cli.main(["upload", str(target), "--delete-after-upload"])
     assert rc != 0
     assert target.exists()

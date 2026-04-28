@@ -11,9 +11,9 @@ import pytest
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
-from ade_dedrm import cli, epub, keyfetch  # noqa: F401
-from ade_dedrm.cli import _default_output
-from ade_dedrm.epub import decrypt_book, is_adept_epub
+from dedrm import cli, epub, keyfetch  # noqa: F401
+from dedrm.cli import _default_output
+from dedrm.epub import decrypt_book, is_adept_epub
 
 
 def test_cli_help_runs(capsys: pytest.CaptureFixture[str]) -> None:

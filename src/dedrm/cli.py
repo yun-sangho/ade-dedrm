@@ -1,4 +1,4 @@
-"""Command-line entry point for ade-dedrm."""
+"""Command-line entry point for dedrm."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ import sys
 import traceback
 from pathlib import Path
 
-from ade_dedrm import __version__
-from ade_dedrm.epub import ADEPTError as EpubError
-from ade_dedrm.epub import decrypt_book
-from ade_dedrm.keyfetch import ADEPTError as KeyError_
-from ade_dedrm.keyfetch import extract_adobe_key
-from ade_dedrm.pdf import ADEPTError as PdfError
-from ade_dedrm.pdf import decrypt_pdf
+from dedrm import __version__
+from dedrm.epub import ADEPTError as EpubError
+from dedrm.epub import decrypt_book
+from dedrm.keyfetch import ADEPTError as KeyError_
+from dedrm.keyfetch import extract_adobe_key
+from dedrm.pdf import ADEPTError as PdfError
+from dedrm.pdf import decrypt_pdf
 
 EXIT_OK = 0
 EXIT_NOT_DRM = 1
@@ -28,7 +28,7 @@ EXIT_UPLOAD_FAIL = 5
 def _invoked_name() -> str:
     argv0 = sys.argv[0] if sys.argv else ""
     name = os.path.basename(argv0) if argv0 else ""
-    return name or "ade-dedrm"
+    return name or "dedrm"
 
 
 def _add_calibre_flags(parser: argparse.ArgumentParser) -> None:
@@ -81,7 +81,7 @@ def _build_parser() -> argparse.ArgumentParser:
     init.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite existing ade-dedrm state and any -o target.",
+        help="Overwrite existing dedrm state and any -o target.",
     )
     init.add_argument(
         "-o",
@@ -138,7 +138,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     cfg = sub.add_parser(
         "config",
-        help="Manage persistent ade-dedrm settings (Calibre Web credentials).",
+        help="Manage persistent dedrm settings (Calibre Web credentials).",
     )
     cfg_sub = cfg.add_subparsers(dest="config_command", required=True)
 
@@ -167,8 +167,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
-    from ade_dedrm.adobe_import import ADEImportError, import_from_ade
-    from ade_dedrm.adobe_state import DeviceState, state_dir
+    from dedrm.adobe_import import ADEImportError, import_from_ade
+    from dedrm.adobe_state import DeviceState, state_dir
 
     state = DeviceState(root=state_dir())
     if state.exists() and not args.force:
@@ -201,7 +201,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
     key_path = state.root / "adobekey.der"
     key_path.write_bytes(key)
     key_path.chmod(0o600)
-    print(f"Initialized ade-dedrm state in {state.root} (key: '{label}')")
+    print(f"Initialized dedrm state in {state.root} (key: '{label}')")
     if args.key_output is not None:
         args.key_output.parent.mkdir(parents=True, exist_ok=True)
         args.key_output.write_bytes(key)
@@ -258,7 +258,7 @@ def _resolve_userkey(args: argparse.Namespace) -> bytes | int:
 
     Order: explicit --key > <state_dir>/adobekey.der > extract_adobe_key().
     """
-    from ade_dedrm.adobe_state import DeviceState, state_dir
+    from dedrm.adobe_state import DeviceState, state_dir
 
     if args.key is not None:
         if not args.key.is_file():
@@ -275,7 +275,7 @@ def _resolve_userkey(args: argparse.Namespace) -> bytes | int:
     except KeyError_ as exc:
         print(f"error: {exc}", file=sys.stderr)
         print(
-            "error: no user key available. Pass -k, or run `ade-dedrm init` first.",
+            "error: no user key available. Pass -k, or run `dedrm init` first.",
             file=sys.stderr,
         )
         return EXIT_IO
@@ -344,15 +344,15 @@ def _handle_drm_file(args: argparse.Namespace) -> int:
 
 
 def _handle_acsm(args: argparse.Namespace) -> int:
-    from ade_dedrm.adobe_download import download_from_fulfill
-    from ade_dedrm.adobe_fulfill import FulfillmentError, fulfill
-    from ade_dedrm.adobe_http import AdeptHTTPError
-    from ade_dedrm.adobe_state import DeviceState, state_dir
+    from dedrm.adobe_download import download_from_fulfill
+    from dedrm.adobe_fulfill import FulfillmentError, fulfill
+    from dedrm.adobe_http import AdeptHTTPError
+    from dedrm.adobe_state import DeviceState, state_dir
 
     state = DeviceState(root=state_dir())
     if not state.exists():
         print(
-            "error: no ade-dedrm activation state found. Run `ade-dedrm init` first.",
+            "error: no dedrm activation state found. Run `dedrm init` first.",
             file=sys.stderr,
         )
         return EXIT_IO
@@ -429,8 +429,8 @@ def _cli_calibre_overrides(args: argparse.Namespace) -> dict:
 
 
 def _upload_file(args: argparse.Namespace, path: Path) -> int:
-    from ade_dedrm.calibre_web import CalibreWebClient, CalibreWebError
-    from ade_dedrm.config import ConfigError, load_calibre_settings
+    from dedrm.calibre_web import CalibreWebClient, CalibreWebError
+    from dedrm.config import ConfigError, load_calibre_settings
 
     try:
         settings = load_calibre_settings(
@@ -512,13 +512,13 @@ def _collect_set_calibre_partial(args: argparse.Namespace) -> dict:
 
 
 def _cmd_config_set_calibre(args: argparse.Namespace) -> int:
-    from ade_dedrm.config import ConfigError, save_calibre_settings
+    from dedrm.config import ConfigError, save_calibre_settings
 
     partial = _collect_set_calibre_partial(args)
     if not partial:
         print(
             "error: nothing to save (pass --url/--username/--password/--verify-tls "
-            "or use `ade-dedrm config setup` for an interactive prompt)",
+            "or use `dedrm config setup` for an interactive prompt)",
             file=sys.stderr,
         )
         return EXIT_IO
@@ -534,7 +534,7 @@ def _cmd_config_set_calibre(args: argparse.Namespace) -> int:
 def _cmd_config_setup() -> int:
     import getpass
 
-    from ade_dedrm.config import (
+    from dedrm.config import (
         ConfigError,
         describe_sources,
         save_calibre_settings,
@@ -547,17 +547,17 @@ def _cmd_config_setup() -> int:
 
     current_url = (
         (effective.url if effective else None)
-        or process_values.get("ADE_DEDRM_CALIBRE_URL")
-        or env_file_values.get("ADE_DEDRM_CALIBRE_URL")
+        or process_values.get("DEDRM_CALIBRE_URL")
+        or env_file_values.get("DEDRM_CALIBRE_URL")
     )
     current_username = (
         (effective.username if effective else None)
-        or process_values.get("ADE_DEDRM_CALIBRE_USERNAME")
-        or env_file_values.get("ADE_DEDRM_CALIBRE_USERNAME")
+        or process_values.get("DEDRM_CALIBRE_USERNAME")
+        or env_file_values.get("DEDRM_CALIBRE_USERNAME")
     )
     has_existing_pw = bool(effective.password if effective else None) or bool(
-        process_values.get("ADE_DEDRM_CALIBRE_PASSWORD")
-        or env_file_values.get("ADE_DEDRM_CALIBRE_PASSWORD")
+        process_values.get("DEDRM_CALIBRE_PASSWORD")
+        or env_file_values.get("DEDRM_CALIBRE_PASSWORD")
     )
 
     print("Interactive Calibre Web setup. Press Enter to keep the existing value.")
@@ -603,10 +603,10 @@ def _cmd_config_setup() -> int:
 
 
 def _cmd_config_show() -> int:
-    from ade_dedrm.adobe_state import DeviceState, state_dir
-    from ade_dedrm.config import describe_sources, persistent_env_path
+    from dedrm.adobe_state import DeviceState, state_dir
+    from dedrm.config import describe_sources, persistent_env_path
 
-    # ADE activation state — populated by `ade-dedrm init`. Shown first
+    # ADE activation state — populated by `dedrm init`. Shown first
     # because `decrypt` depends on it; Calibre Web settings below are
     # only relevant for `upload` / `decrypt --upload`.
     sd = state_dir()
@@ -619,7 +619,7 @@ def _cmd_config_show() -> int:
     )
     print(f"# state directory: {sd}")
     if not any(p.is_file() for _, p in state_files):
-        print("  (not initialised — run `ade-dedrm init`)")
+        print("  (not initialised — run `dedrm init`)")
     else:
         for name, path in state_files:
             mark = "present" if path.is_file() else "missing"
@@ -627,7 +627,7 @@ def _cmd_config_show() -> int:
         if state.exists():
             print("  status: ready (decrypt can run)")
         else:
-            print("  status: incomplete (re-run `ade-dedrm init --force`)")
+            print("  status: incomplete (re-run `dedrm init --force`)")
 
     print()
     sources = describe_sources()
@@ -637,13 +637,13 @@ def _cmd_config_show() -> int:
     if env_file is not None:
         print(f"# .env file: {env_file}")
         if not env_file_values:
-            print("  (no ADE_DEDRM_CALIBRE_* vars in this file)")
+            print("  (no DEDRM_CALIBRE_* vars in this file)")
         else:
             for var in (
-                "ADE_DEDRM_CALIBRE_URL",
-                "ADE_DEDRM_CALIBRE_USERNAME",
-                "ADE_DEDRM_CALIBRE_PASSWORD",
-                "ADE_DEDRM_CALIBRE_VERIFY_TLS",
+                "DEDRM_CALIBRE_URL",
+                "DEDRM_CALIBRE_USERNAME",
+                "DEDRM_CALIBRE_PASSWORD",
+                "DEDRM_CALIBRE_VERIFY_TLS",
             ):
                 if var in env_file_values:
                     display = "***" if "PASSWORD" in var else env_file_values[var]
@@ -655,13 +655,13 @@ def _cmd_config_show() -> int:
     process_env_values = sources.get("process_env_values") or {}
     print("\n# process environment:")
     if not process_env_values:
-        print("  (no ADE_DEDRM_CALIBRE_* vars set)")
+        print("  (no DEDRM_CALIBRE_* vars set)")
     else:
         for var in (
-            "ADE_DEDRM_CALIBRE_URL",
-            "ADE_DEDRM_CALIBRE_USERNAME",
-            "ADE_DEDRM_CALIBRE_PASSWORD",
-            "ADE_DEDRM_CALIBRE_VERIFY_TLS",
+            "DEDRM_CALIBRE_URL",
+            "DEDRM_CALIBRE_USERNAME",
+            "DEDRM_CALIBRE_PASSWORD",
+            "DEDRM_CALIBRE_VERIFY_TLS",
         ):
             if var in process_env_values:
                 display = "***" if "PASSWORD" in var else process_env_values[var]
@@ -673,8 +673,8 @@ def _cmd_config_show() -> int:
         missing = sources.get("missing") or []
         print("  (incomplete — missing: " + ", ".join(missing) + ")")
         print(
-            "  hint: run `ade-dedrm config setup` or set "
-            "ADE_DEDRM_CALIBRE_URL/USERNAME/PASSWORD",
+            "  hint: run `dedrm config setup` or set "
+            "DEDRM_CALIBRE_URL/USERNAME/PASSWORD",
         )
     else:
         for key in _CALIBRE_KEYS_ORDERED:

@@ -13,18 +13,18 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509 import CertificateBuilder, Name, NameAttribute
 from cryptography.x509.oid import NameOID
 
-from ade_dedrm.adobe_state import DeviceState, load_pkcs12_private_key_der, state_dir
+from dedrm.adobe_state import DeviceState, load_pkcs12_private_key_der, state_dir
 
 
 def test_state_dir_env_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("ADE_DEDRM_HOME", str(tmp_path / "custom"))
+    monkeypatch.setenv("DEDRM_HOME", str(tmp_path / "custom"))
     assert state_dir() == tmp_path / "custom"
 
 
 def test_state_dir_xdg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.delenv("ADE_DEDRM_HOME", raising=False)
+    monkeypatch.delenv("DEDRM_HOME", raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
-    assert state_dir() == tmp_path / "xdg" / "ade-dedrm"
+    assert state_dir() == tmp_path / "xdg" / "dedrm"
 
 
 def _make_pkcs12(password: bytes) -> bytes:
@@ -43,7 +43,7 @@ def _make_pkcs12(password: bytes) -> bytes:
         .sign(priv, hashes.SHA256())
     )
     return pkcs12.serialize_key_and_certificates(
-        name=b"ade-dedrm-test",
+        name=b"dedrm-test",
         key=priv,
         cert=cert,
         cas=None,

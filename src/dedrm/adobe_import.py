@@ -20,7 +20,7 @@ from pathlib import Path
 
 import xml.etree.ElementTree as etree
 
-from ade_dedrm.adobe_state import ADEPT_NS, DeviceState, state_dir
+from dedrm.adobe_state import ADEPT_NS, DeviceState, state_dir
 
 # These are the ADE version strings we'll claim to be. Must stay in sync
 # with the lists in DeACSM/libadobe.py.

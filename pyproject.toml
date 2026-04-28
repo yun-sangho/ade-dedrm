@@ -1,6 +1,6 @@
 [project]
-name = "ade-dedrm"
-version = "0.1.6"
+name = "dedrm"
+version = "0.2.0"
 description = "CLI to remove Adobe Digital Editions (Adept) DRM from ePub files."
 readme = "README.md"
 authors = [
@@ -15,8 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ade-dedrm = "ade_dedrm.cli:main"
-dedrm = "ade_dedrm.cli:main"
+dedrm = "dedrm.cli:main"
 
 [dependency-groups]
 dev = [
@@ -29,4 +28,4 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ade_dedrm"]
+packages = ["src/dedrm"]

@@ -1,4 +1,4 @@
-"""User-facing configuration for ade-dedrm.
+"""User-facing configuration for dedrm.
 
 Holds Calibre Web credentials only. Resolution order for each field
 (high → low): CLI override, process environment, ``.env`` file. The
@@ -7,9 +7,9 @@ persistent store *is* the ``.env`` file — no separate JSON config.
 ``.env`` lookup order (first match wins):
   1. explicit path passed via ``env_file`` / ``--env-file``
   2. ``./.env`` in the current working directory
-  3. ``<state_dir>/.env`` (e.g. ``~/.config/ade-dedrm/.env``)
+  3. ``<state_dir>/.env`` (e.g. ``~/.config/dedrm/.env``)
 
-The ``state_dir`` copy is where ``ade-dedrm config setup`` / ``config
+The ``state_dir`` copy is where ``dedrm config setup`` / ``config
 set-calibre`` write, so values persist across sessions without landing
 in random per-project ``.env`` files.
 """
@@ -20,12 +20,12 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from ade_dedrm.adobe_state import state_dir
+from dedrm.adobe_state import state_dir
 
-ENV_CALIBRE_URL = "ADE_DEDRM_CALIBRE_URL"
-ENV_CALIBRE_USERNAME = "ADE_DEDRM_CALIBRE_USERNAME"
-ENV_CALIBRE_PASSWORD = "ADE_DEDRM_CALIBRE_PASSWORD"
-ENV_CALIBRE_VERIFY_TLS = "ADE_DEDRM_CALIBRE_VERIFY_TLS"
+ENV_CALIBRE_URL = "DEDRM_CALIBRE_URL"
+ENV_CALIBRE_USERNAME = "DEDRM_CALIBRE_USERNAME"
+ENV_CALIBRE_PASSWORD = "DEDRM_CALIBRE_PASSWORD"
+ENV_CALIBRE_VERIFY_TLS = "DEDRM_CALIBRE_VERIFY_TLS"
 
 _CALIBRE_ENV_VARS = (
     ENV_CALIBRE_URL,
@@ -146,7 +146,7 @@ def load_calibre_settings(
             "missing Calibre Web settings: "
             + ", ".join(missing)
             + f". Set via CLI flags, env vars ({ENV_CALIBRE_URL} etc.), "
-            "a .env file, or `ade-dedrm config setup`."
+            "a .env file, or `dedrm config setup`."
         )
 
     return CalibreWebSettings(
