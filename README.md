@@ -17,7 +17,7 @@
 
 | Task | Subcommand | Output |
 |---|---|---|
-| Bootstrap state + user key from a local ADE install (macOS) | `init` | state files + `adobekey.der` under `~/.config/dedrm/` |
+| Bootstrap state + user key from a local ADE installation (macOS and Windows) | `init` | state files + `adobekey.der` under `~/.config/dedrm/` |
 | ACSM fulfillment and/or Adept DRM removal (EPUB/PDF/ACSM auto-detected) | `decrypt` | DRM-free EPUB or PDF |
 | Upload a decrypted EPUB/PDF to a [Calibre Web](https://github.com/janeczku/calibre-web) library | `upload` | new book in your Calibre Web instance |
 | Persist Calibre Web connection details | `config setup` / `config set-calibre` / `config show` | `~/.config/dedrm/.env` (mode 0600) |
@@ -29,7 +29,7 @@ brew install yun-sangho/tap/dedrm
 dedrm --help
 ```
 
-## Quick start (macOS)
+## Quick start (macOS and Windows)
 
 Assuming Adobe Digital Editions is already installed and authorized with
 your Adobe ID:
@@ -45,11 +45,10 @@ dedrm decrypt ~/Downloads/book.acsm
 
 ## Subcommand reference
 
-### `init` — bootstrap state + user key from a local ADE install (macOS only)
+### `init` — bootstrap state + user key from a local ADE install (macOS and Windows)
 
-Combines `~/Library/Application Support/Adobe/Digital Editions/activation.dat`
-with the `DeviceKey` / `DeviceFingerprint` entries stored in the macOS
-keychain, producing `~/.config/dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
+Locates the local Adobe Digital Editions installation and extracts the activation data and device secrets
+(from the macOS keychain or Windows Credential Locker), producing `~/.config/dedrm/{devicesalt, device.xml, activation.xml, adobekey.der}`
 in one shot.
 
 ```bash

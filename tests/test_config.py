@@ -149,8 +149,9 @@ def test_save_calibre_settings_chmod_600(_isolated_state: Path) -> None:
         {"url": "http://cw.local", "username": "alice", "password": "p"}
     )
     assert path == persistent_env_path()
-    mode = stat.S_IMODE(os.stat(path).st_mode)
-    assert mode == 0o600
+    if os.name != 'nt':  # Skip on Windows (os.name == 'nt')
+        mode = stat.S_IMODE(os.stat(path).st_mode)
+        assert mode == 0o600
     parsed = parse_env_file(path)
     assert parsed["DEDRM_CALIBRE_URL"] == "http://cw.local"
     assert parsed["DEDRM_CALIBRE_USERNAME"] == "alice"

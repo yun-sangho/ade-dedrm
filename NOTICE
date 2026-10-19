@@ -29,5 +29,10 @@ Specifically:
   (adeptkeys / findActivationDat). The Windows and Linux branches, the ctypes
   Windows API bindings, and the Tkinter GUI have been removed.
 
+- The Windows-specific key extraction logic in src/dedrm/cli.py (function _cmd_init)
+  is adapted from the Windows branch of DeDRM_tools/DeDRM_plugin/adobekey.py.
+  The macOS and Linux branches, the Tkinter GUI, and the Python 2 compatibility
+  shims have been removed.
+
 The original authors retain copyright on the ported portions. This project
 inherits the GPL v3 license from that upstream work.

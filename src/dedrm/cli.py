@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import re
 import sys
 import traceback
@@ -16,6 +17,8 @@ from dedrm.keyfetch import ADEPTError as KeyError_
 from dedrm.keyfetch import extract_adobe_key
 from dedrm.pdf import ADEPTError as PdfError
 from dedrm.pdf import decrypt_pdf
+
+from . import adobekey
 
 EXIT_OK = 0
 EXIT_NOT_DRM = 1
@@ -187,18 +190,38 @@ def _cmd_init(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return EXIT_IO
-    try:
-        import_from_ade(state)
-    except ADEImportError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return EXIT_IO
-    try:
-        key, label = extract_adobe_key()
-    except KeyError_ as exc:
-        print(f"error: {exc}", file=sys.stderr)
+
+    if platform.system() == "Darwin":
+        # macOS path
+        try:
+            import_from_ade(state)
+        except ADEImportError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return EXIT_IO
+        try:
+            key, label = extract_adobe_key()
+        except KeyError_ as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return EXIT_IO
+    elif platform.system() == "Windows":
+        # Windows path
+        try:
+            # Use the Windows key extraction logic from adobekey.py
+            windows_keys = adobekey.adeptkeys()
+            if not windows_keys:
+                raise KeyError_("Could not retrieve Adobe Adept key on Windows")
+            key = windows_keys[0]
+            label = "Windows"
+        except Exception as exc:
+            # Wrap any exception in ADEPTError for consistent handling
+            print(f"error: {exc}", file=sys.stderr)
+            return EXIT_IO
+    else:
+        print(f"error: Unsupported platform: {platform.system()}", file=sys.stderr)
         return EXIT_IO
 
     key_path = state.root / "adobekey.der"
+    key_path.parent.mkdir(parents=True, exist_ok=True)
     key_path.write_bytes(key)
     key_path.chmod(0o600)
     print(f"Initialized dedrm state in {state.root} (key: '{label}')")
